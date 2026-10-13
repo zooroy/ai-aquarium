@@ -1,0 +1,48 @@
+import { Color, Fog, Mesh, MeshLambertMaterial, Scene } from 'three';
+import { expect, it, vi } from 'vitest';
+import { createSand } from '../../../src/render/environment/sand';
+import { createLighting } from '../../../src/render/environment/lighting';
+import { createRandom } from '../../../src/core/random';
+import { computeTankBounds } from '../../../src/core/tank-bounds';
+import { PALETTE } from '../../../src/config/palette';
+
+const boundsFor = (aspect: number) => computeTankBounds({ fovDeg: 45, cameraZ: 14, aspect });
+it('creates seeded non-indexed sand below the fish bounds and rebuilds on resize', () => {
+  let bounds = boundsFor(16 / 9);
+  const scene = new Scene();
+  const sand = createSand(scene, { random: createRandom(42), getBounds: () => bounds });
+  const mesh = scene.getObjectByName('sand') as Mesh;
+  expect(mesh.geometry.index).toBeNull();
+  expect((mesh.material as MeshLambertMaterial).flatShading).toBe(true);
+  expect((mesh.material as MeshLambertMaterial).color.getHex()).toBe(PALETTE.sand);
+  const positions = mesh.geometry.getAttribute('position');
+  const heights = Array.from({ length: positions.count }, (_, i) => positions.getY(i));
+  expect(Math.max(...heights)).toBeLessThan(bounds.min.y);
+  expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.1);
+  const otherScene = new Scene();
+  const other = createSand(otherScene, { random: createRandom(42), getBounds: () => bounds });
+  expect((otherScene.getObjectByName('sand') as Mesh).geometry.getAttribute('position').array).toEqual(positions.array);
+  const oldGeometry = mesh.geometry;
+  const disposeGeometry = vi.spyOn(oldGeometry, 'dispose');
+  bounds = boundsFor(9 / 16);
+  sand.update(1);
+  expect(mesh.geometry).not.toBe(oldGeometry);
+  expect(disposeGeometry).toHaveBeenCalledOnce();
+  const disposeMaterial = vi.spyOn(mesh.material as MeshLambertMaterial, 'dispose');
+  sand.dispose();
+  expect(scene.children).toHaveLength(0);
+  expect(disposeMaterial).toHaveBeenCalledOnce();
+  other.dispose();
+});
+it('creates warm lighting and matching background/fog, then releases scene objects', () => {
+  const scene = new Scene();
+  const lighting = createLighting(scene, { random: createRandom(42), getBounds: () => boundsFor(1) });
+  expect(scene.children.map((child) => child.type)).toEqual(['HemisphereLight', 'DirectionalLight']);
+  expect((scene.background as Color).getHex()).toBe(PALETTE.fog);
+  expect((scene.fog as Fog).color.getHex()).toBe(PALETTE.fog);
+  lighting.update(1);
+  lighting.dispose();
+  expect(scene.children).toHaveLength(0);
+  expect(scene.fog).toBeNull();
+  expect(scene.background).toBeNull();
+});
