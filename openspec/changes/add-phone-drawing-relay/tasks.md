@@ -28,18 +28,18 @@
 
 ## 2. 前端轉交模組（純邏輯）
 
-- [ ] 2.1 實作 `src/core/device-mode.ts`（D3）和 `DEVICE_PARAMS`。驗證方式：單元測試涵蓋：
+- [x] 2.1 實作 `src/core/device-mode.ts`（D3）和 `DEVICE_PARAMS`。驗證方式：單元測試涵蓋：
   - iPhone（觸控、短邊 390）為 draw。
   - iPad（觸控、短邊 820）為 tank。
   - 桌電（非觸控、短邊 1080）為 tank。
   - 網址參數 `mode=draw` 和 `mode=tank` 優先；無效的參數值被忽略。
-- [ ] 2.2 實作 `src/relay/room-code.ts`（D5）。驗證方式：單元測試涵蓋：
+- [x] 2.2 實作 `src/relay/room-code.ts`（D5）。驗證方式：單元測試涵蓋：
   - 16 bytes 轉成 22 字元的 base64url。
   - `isRoomCode` 的正反例。
   - storage 已有合法代碼時沿用；沒有或不合法時產生新的並寫回。
   - storage 讀寫會丟錯時，仍回傳合法的暫時代碼。
-- [ ] 2.3 實作 `src/relay/relay-client.ts`（D5）。驗證方式：用假的 `fetch` 寫單元測試，涵蓋 upload 的 201、429、400、413、500 和 TypeError 分別對應的結果；list、download、remove 的網址與方法正確，非 2xx 時丟錯。
-- [ ] 2.4 實作 `src/relay/fish-inbox.ts`（D5）。驗證方式：用假的 client 和計時器寫單元測試：
+- [x] 2.3 實作 `src/relay/relay-client.ts`（D5）。驗證方式：用假的 `fetch` 寫單元測試，涵蓋 upload 的 201、429、400、413、500 和 TypeError 分別對應的結果；list、download、remove 的網址與方法正確，非 2xx 時丟錯。
+- [x] 2.4 實作 `src/relay/fish-inbox.ts`（D5）。驗證方式：用假的 client 和計時器寫單元測試：
   - `placed` 和 `invalid` 會呼叫 remove。
   - 遇到 `full` 時停止這一輪、不呼叫 remove，並呼叫 `onWaiting(true)`；下一輪沒有 `full` 時呼叫 `onWaiting(false)`。
   - list 或 download 丟錯時，排程仍然繼續。
