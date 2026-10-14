@@ -69,3 +69,13 @@ it('updates panic frequency/amplitude every frame without mutating fish position
   expect(new Vector3().setFromMatrixPosition(matrix).distanceTo(original)).toBeLessThan(1e-6);
   renderer.dispose();
 });
+
+it('skips custom variant -1 without affecting normal instances',()=>{
+  const scene=new Scene(),renderer=new FishRenderer(scene),fish=school(4);
+  fish[0].variant=-1;fish[0].customId='custom';
+  expect(()=>renderer.sync(fish,1)).not.toThrow();
+  expect(scene.children.reduce((sum,child)=>sum+(child as InstancedMesh).count,0)).toBe(3);
+  renderer.sync([fish[0]],2);
+  expect(scene.children.every(child=>(child as InstancedMesh).count===0)).toBe(true);
+  renderer.dispose();
+});

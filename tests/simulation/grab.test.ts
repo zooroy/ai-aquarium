@@ -140,3 +140,28 @@ it('selects the nearest center when projected hit regions overlap, regardless of
   new GrabController().update({ pointers: [pointer] }, fish, 0, ctx);
   expect(fish.map(f => f.mode)).toEqual(['swimming', 'grabbed']);
 });
+
+it.each(['mouse','touch','hand'] as const)('disables grabbing immediately for %s and requires release after enabling',source=>{
+  const fish=school(1),grab=new GrabController(),pressed={...pointer,source};
+  grab.update({pointers:[pressed]},fish,0,ctx);
+  grab.setEnabled(false);
+  expect(fish[0].mode).toBe('fleeing');
+  expect(fish[0].velocity.x).toBeGreaterThan(0);
+  expect(fish[0].velocity.length()).toBeCloseTo(FISH_PARAMS.maxSpeed*GRAB_PARAMS.fleeSpeedMultiplier);
+  grab.update({pointers:[]},fish,0,ctx);
+  grab.update({pointers:[pressed]},fish,0,ctx);
+  expect(fish[0].mode).toBe('fleeing');
+  grab.setEnabled(true);
+  grab.update({pointers:[pressed]},fish,0,ctx);
+  grab.update({pointers:[pressed]},fish,0,ctx);
+  expect(fish[0].mode).toBe('fleeing');
+  grab.update({pointers:[{...pressed,pressed:false}]},fish,0,ctx);
+  grab.update({pointers:[pressed]},fish,0,ctx);
+  expect(fish[0].mode).toBe('grabbed');
+});
+it('suppresses a new pointer held between enabling and the first update',()=>{
+  const fish=school(1),grab=new GrabController();
+  grab.setEnabled(false);grab.setEnabled(true);
+  grab.update({pointers:[pointer]},fish,0,ctx);
+  expect(fish[0].mode).toBe('swimming');
+});

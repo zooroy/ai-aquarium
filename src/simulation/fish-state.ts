@@ -5,6 +5,7 @@ import type { Random } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 
 export interface Fish {
+  customId?: string;
   mode: 'swimming' | 'grabbed' | 'fleeing';
   panic: number;
   fleeTime: number;

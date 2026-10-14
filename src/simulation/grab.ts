@@ -13,32 +13,53 @@ export interface GrabContext {
 
 /** 主迴圈先呼叫 update，再 stepSchool；controller 不持有相機或渲染物件。 */
 export class GrabController {
+  private enabled = true;
+  private resync = false;
   private previous = new Map<string, boolean>();
-  private held: { fish: Fish; pointerId: string; x: number; y: number } | undefined;
+  private held: { fish: Fish; pointerId: string; x: number; y: number; origin: Vector3 } | undefined;
+
+
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    if (!enabled && this.held) this.release(this.held.origin);
+    if (enabled) this.resync = true;
+  }
+  private release(origin: Vector3): void {
+    const held = this.held;
+    if (!held) return;
+    const direction = new Vector3(held.fish.position.x - origin.x, held.fish.position.y - origin.y, 0);
+    if (direction.lengthSq() < 1e-12) direction.set(-held.fish.forward.x, -held.fish.forward.y, 0);
+    if (direction.lengthSq() < 1e-12) direction.set(1, 0, 0);
+    const pitch = Math.max(-FISH_PARAMS.maxPitch, Math.min(FISH_PARAMS.maxPitch,
+      Math.atan2(direction.y, Math.abs(direction.x))));
+    // 逃走保持在 world xy 平面；幾乎垂直時沿原朝向選擇左右，無 x 朝向則固定向右。
+    const horizontalSign = Math.abs(direction.x) > 1e-6
+      ? Math.sign(direction.x) : (held.fish.forward.x < 0 ? -1 : 1);
+    direction.set(horizontalSign * Math.cos(pitch), Math.sin(pitch), 0);
+    held.fish.velocity.copy(direction).multiplyScalar(FISH_PARAMS.maxSpeed * p.fleeSpeedMultiplier);
+    held.fish.forward.copy(direction);
+    held.fish.mode = 'fleeing'; held.fish.fleeTime = 0; held.fish.panic = 1;
+    this.held = undefined;
+  }
 
   update(state: InputState, fish: Fish[], dt: number, ctx: GrabContext): void {
     if (!Number.isFinite(dt) || dt < 0) throw new RangeError('Expected finite nonnegative dt');
     if (!Number.isFinite(ctx.aspect) || ctx.aspect <= 0) throw new RangeError('Expected positive finite aspect');
-    if (this.held && (!fish.includes(this.held.fish) || this.held.fish.mode !== 'grabbed')) this.held = undefined;
+    if (this.held && !fish.includes(this.held.fish)) this.release(this.held.origin);
+    if (this.held && this.held.fish.mode !== 'grabbed') this.held = undefined;
+    if (!this.enabled || this.resync) {
+      this.previous = new Map(state.pointers.map(pointer => [pointer.id,pointer.pressed]));
+      this.resync = false;
+      return;
+    }
     if (this.held) {
       const owner = state.pointers.find((pointer) => pointer.id === this.held!.pointerId);
       if (!owner?.pressed) {
         const held = this.held;
         const pointer = owner ?? held;
         const origin = ctx.screenToWorld(pointer.x, pointer.y, p.holdZ);
-        const direction = new Vector3(held.fish.position.x - origin.x, held.fish.position.y - origin.y, 0);
-        if (direction.lengthSq() < 1e-12) direction.set(-held.fish.forward.x, -held.fish.forward.y, 0);
-        if (direction.lengthSq() < 1e-12) direction.set(1, 0, 0);
-        const pitch = Math.max(-FISH_PARAMS.maxPitch, Math.min(FISH_PARAMS.maxPitch,
-          Math.atan2(direction.y, Math.abs(direction.x))));
-        // 逃走保持在 world xy 平面；幾乎垂直時沿原朝向選擇左右，無 x 朝向則固定向右。
-        const horizontalSign = Math.abs(direction.x) > 1e-6
-          ? Math.sign(direction.x) : (held.fish.forward.x < 0 ? -1 : 1);
-        direction.set(horizontalSign * Math.cos(pitch), Math.sin(pitch), 0);
-        held.fish.velocity.copy(direction).multiplyScalar(FISH_PARAMS.maxSpeed * p.fleeSpeedMultiplier);
-        held.fish.forward.copy(direction);
-        held.fish.mode = 'fleeing'; held.fish.fleeTime = 0; held.fish.panic = 1;
-        this.held = undefined;
+        this.release(origin);
       }
     }
     if (!this.held && !fish.some((item) => item.mode === 'grabbed')) {
@@ -57,7 +78,7 @@ export class GrabController {
         }
         if (nearest) {
           nearest.mode = 'grabbed'; nearest.fleeTime = 0;
-          this.held = { fish: nearest, pointerId: pointer.id, x: pointer.x, y: pointer.y };
+          this.held = { fish: nearest, pointerId: pointer.id, x: pointer.x, y: pointer.y, origin: ctx.screenToWorld(pointer.x,pointer.y,p.holdZ) };
           break;
         }
       }
@@ -72,6 +93,7 @@ export class GrabController {
       item.position.z += (target.z - item.position.z) * z;
       for (const axis of ['x', 'y', 'z'] as const) item.position[axis] = Math.max(ctx.bounds.min[axis], Math.min(axis === 'z' ? Math.max(ctx.bounds.max.z, p.holdZ) : ctx.bounds.max[axis], item.position[axis]));
       item.panic = Math.min(1, item.panic + dt / p.panicRise);
+      this.held.origin.copy(target);
       this.held.x = pointer.x; this.held.y = pointer.y;
     }
     this.previous = new Map(state.pointers.map((pointer) => [pointer.id, pointer.pressed]));

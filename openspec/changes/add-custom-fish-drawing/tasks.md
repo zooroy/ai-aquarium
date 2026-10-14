@@ -15,17 +15,17 @@
 
 ## 2. 儲存與模擬
 
-- [ ] 2.1 實作 `src/storage/custom-fish-store.ts`（D7）：介面、`MemoryStore`、`IndexedDbStore`、`createStore()`（失敗時退回記憶體，並回報「無法保存」）。驗證方式：
+- [x] 2.1 實作 `src/storage/custom-fish-store.ts`（D7）：介面、`MemoryStore`、`IndexedDbStore`、`createStore()`（失敗時退回記憶體，並回報「無法保存」）。驗證方式：
   - 單元測試涵蓋 `MemoryStore` 的新增、列出（依 createdAt 排序）、刪除。
   - `createStore()` 在注入的工廠拋錯，或 `indexedDB` 不存在時，退回 `MemoryStore`，且 `persistent === false`。
   - `IndexedDbStore` 只需要 typecheck 與 build 通過，由 Claude 在瀏覽器驗收。
-- [ ] 2.2 實作 `src/simulation/custom-fish.ts`（D5）：`Fish.customId`、`spawnCustomFish()`、`removeCustomFish()`，以及上限檢查函式。驗證方式：
+- [x] 2.2 實作 `src/simulation/custom-fish.ts`（D5）：`Fish.customId`、`spawnCustomFish()`、`removeCustomFish()`，以及上限檢查函式。驗證方式：
   - 單元測試確認生成的魚在魚缸中央附近，速度為 `maxSpeed`，`variant` 為 -1，id 不重複。
   - 刪除後陣列少一隻。
   - 刪除被抓住的魚後，`GrabController` 下一幀會放開而且不會出錯。
   - 第 21 隻會被上限擋下。
   - 既有的 boids 測試全部通過。
-- [ ] 2.3 在 `GrabController` 加入 `setEnabled()`（D6）。驗證方式：單元測試涵蓋 fish-grab spec「畫圖時暫停抓取」的兩個情境，以及重新啟用的那一刻，已經按住的游標不會誤抓。
+- [x] 2.3 在 `GrabController` 加入 `setEnabled()`（D6）。驗證方式：單元測試涵蓋 fish-grab spec「畫圖時暫停抓取」的兩個情境，以及重新啟用的那一刻，已經按住的游標不會誤抓。
 
 ## 3. 自訂魚渲染
 
