@@ -5,15 +5,11 @@ import { advanceHandBubbles, bubbleOpacity, transformHandJoints } from '../../..
 import { HandProvider } from '../../../src/input/hand/hand-provider';
 import { createReplaySource, getReplayScript } from '../../../src/input/hand/replay-source';
 import { HAND_PARAMS, HAND_RENDER_PARAMS } from '../../../src/config/params';
-import { readFileSync } from 'node:fs';
-import { parseGlb } from '../../../scripts/hand-model.mjs';
-function load() {
-  const group=new Group();
-  for(const data of parseGlb(readFileSync('public/models/low-poly-hands.rigged.glb'))) {
-    const geometry=new BufferGeometry();geometry.setAttribute('position',new Float32BufferAttribute(data.vertices.flat(),3));
-    const mesh=new Mesh(geometry,new MeshLambertMaterial());mesh.name=data.name;group.add(mesh);
-  }
-  return Promise.resolve(group);
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { readNativeFixture } from './glb-fixture';
+async function load() {
+  const {bytes}=readNativeFixture();
+  return (await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer,'')).scene;
 }
 function pose() { const provider = new HandProvider(); provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(0), 0); return provider.getHandPose(300); }
 it('keeps provider mirror/y-up and aligns pinch midpoint without scaling camera distance', () => {
@@ -38,16 +34,16 @@ it('loads skinned hands asynchronously, fades, updates depthWrite and releases r
   avatar.sync(state,0,()=>new Vector3(0,0,2));expect(scene.children[0].visible).toBe(false);
   await avatar.ready;
   avatar.sync(state,0,()=>new Vector3(0,0,2));
-  const root=scene.children[0], hands=root.children.filter(c=>c instanceof SkinnedMesh) as SkinnedMesh[];
-  expect(hands).toHaveLength(2);expect(hands.filter(h=>h.visible)).toHaveLength(1);
+  const root=scene.children[0], hands:SkinnedMesh[]=[];root.traverse(c=>{if(c instanceof SkinnedMesh)hands.push(c);});
+  expect(hands).toHaveLength(1);
   const hand=hands.find(h=>h.visible)!;
-  expect(hand.skeleton.bones).toHaveLength(16);
+  expect(hand.skeleton.bones).toHaveLength(21);
   const mat=hand.material as MeshLambertMaterial;expect(mat.side).toBe(FrontSide);expect(mat.depthWrite).toBe(true);
   const colors=hand.geometry.getAttribute('color'),base=Array.from(colors.array);
   avatar.sync({...state,pressed:true,opacity:.5},.01,()=>new Vector3(0,0,2));
   expect(mat.depthWrite).toBe(false);expect(Array.from(colors.array)).not.toEqual(base);
-  expect(root.children.slice(0,8).filter(c=>c.visible)).toHaveLength(8);
-  avatar.sync({...state,pressed:true},.81,()=>new Vector3(0,0,2));expect(root.children.slice(0,8).every(c=>!c.visible)).toBe(true);
+  expect(root.children.slice(1,9).filter(c=>c.visible)).toHaveLength(8);
+  avatar.sync({...state,pressed:true},.81,()=>new Vector3(0,0,2));expect(root.children.slice(1,9).every(c=>!c.visible)).toBe(true);
   avatar.sync({...state,visible:false,opacity:0},.1,()=>new Vector3());expect(root.visible).toBe(false);
   avatar.dispose();expect(scene.children).toHaveLength(0);
 });
@@ -67,4 +63,49 @@ it('tilts around the pinch midpoint without moving the cursor or changing hand s
   expect(handFrame(original).normal.angleTo(handFrame(tilted).normal)).toBeCloseTo(0);
   expect(HAND_RENDER_PARAMS.displayTiltAcross).toBe(0);expect(HAND_RENDER_PARAMS.displayTiltUp).toBe(0);
   for(let i=0;i<21;i++) expect(tilted[i].distanceTo(tilted[0])).toBeCloseTo(original[i].distanceTo(original[0]));
+});
+it('retains native weights/bind matrices and bone offsets while mirroring the outer root',async()=>{
+  const model=await load();let source:SkinnedMesh|undefined;
+  model.traverse(o=>{if(o instanceof SkinnedMesh)source=o;});const mesh=source!;
+  const indices=mesh.geometry.getAttribute('skinIndex'),weights=mesh.geometry.getAttribute('skinWeight');
+  const inverses=mesh.skeleton.boneInverses.map(m=>m.clone());
+  const offsets=mesh.skeleton.bones.map(b=>b.position.clone());
+  const scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load:()=>Promise.resolve(model),debugRig:true});await avatar.ready;
+  const state=pose();
+  for(const mirror of [false,true]) {
+    const joints=state.joints.map(p=>({...p,x:mirror?-p.x:p.x}));
+    avatar.sync({...state,joints},.016,()=>new Vector3(0,0,2.5));
+    expect(mesh.geometry.getAttribute('skinIndex')).toBe(indices);expect(mesh.geometry.getAttribute('skinWeight')).toBe(weights);
+    mesh.skeleton.bones.forEach((bone,i)=>expect(bone.position).toEqual(offsets[i]));
+    mesh.skeleton.boneInverses.forEach((inverse,i)=>expect(inverse).toEqual(inverses[i]));
+  }
+  expect(scene.children[0].children).toHaveLength(1+8+42);
+  avatar.dispose();
+});
+it('places orange retarget markers over actual driven joints after pinch alignment for either hand',async()=>{
+  const {ROOT_BONE,FINGER_BONES,loadedBoneName}=await import('../../../src/render/hand/hand-rig');
+  const fixture=readNativeFixture(),scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load,debugRig:true});await avatar.ready;
+  for(const time of [1000,5000]) for(const mirror of [false,true]) {
+    const provider=new HandProvider();provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(time),time);
+    const state=provider.getHandPose(time+100);
+    if(mirror) state.joints=state.joints.map(p=>({...p,x:-p.x}));
+    const target=new Vector3(.3,-.2,2.5);avatar.sync(state,.016,()=>target);
+    const root=scene.children[0],orange=root.children.slice(1+8+21);
+    const bones=[ROOT_BONE,...FINGER_BONES.flatMap(f=>[...f,'tip'])];
+    const actual=bones.map((name,i)=>{
+      if(name==='tip') {
+        const finger=(i-4)/4,bone=root.getObjectByName(loadedBoneName(FINGER_BONES[finger][2]))!;
+        return fixture.rig.tipLocal[finger].clone().applyMatrix4(bone.matrixWorld);
+      }
+      return root.getObjectByName(loadedBoneName(name))!.getWorldPosition(new Vector3());
+    });
+    const palm=actual[0].distanceTo(actual[9]);
+    actual.forEach((point,i)=>expect(point.distanceTo(orange[i].position)).toBeLessThan(palm*.05));
+    expect(actual[4].clone().add(actual[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-5);
+    if(time===5000) {
+      const center=[0,5,9,13,17].reduce((v,i)=>v.add(actual[i]),new Vector3()).divideScalar(5);
+      expect(actual[4].z).toBeGreaterThan(center.z);expect(actual[8].z).toBeGreaterThan(center.z);
+    }
+  }
+  avatar.dispose();
 });

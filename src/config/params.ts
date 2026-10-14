@@ -143,7 +143,7 @@ export const GRAB_PARAMS = {
 
 export const HAND_RENDER_PARAMS = {
   renderOrder: 10, displayTiltAcross: 0, displayTiltUp: 0,
-  skinBlend: 0.2, rigDotRadius: 0.025,
+  rigDotRadius: 0.025, tipCapRatio: 0.01,
   bubbleCount: 8, bubbleLife: 0.8,
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;

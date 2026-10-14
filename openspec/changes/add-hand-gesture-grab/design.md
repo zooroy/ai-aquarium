@@ -220,6 +220,31 @@ fleeTime: number;    // 進入 fleeing 後經過的秒數
   - 材質：換成 `MeshLambertMaterial({ flatShading: true })`，顏色 `PALETTE.hand.base`。捏合時大拇指和食指末段的頂點以 vertex color 改成 glow。淡入淡出時 `transparent`；opacity 為 1 時 `depthWrite = true`，避免同一網格前後順序畫錯。
   - 移除程序化網格 `hand-mesh.ts`，以及只有它用到的參數。
   - 授權標示：開場卡片底部加一行小字；專案根目錄的 `CREDITS.md` 已由 Claude 新增。
+- 外觀（改用有骨架的模型，取代上面所有版本）：使用者改選 `public/models/vr-hand-right.glb`（Sketchfab「VR Hands: Bouldering (R) Rigged」，Cheezguzzler，CC BY 4.0，預覽 `assets/vr-hand-preview.png`）。檔案自帶 skin：一個 `SkinnedMesh`（504 頂點、252 三角形，有 `JOINTS_0`、`WEIGHTS_0`）、21 個關節、反向綁定矩陣；只有右手；附一段用不到的動畫 `No_RAction`。不再需要程序化綁骨。
+  - 骨頭對應（以 glTF node 名稱為準，靜止姿勢下手指朝 +y、掌心朝 +z 附近；以實際載入的世界座標驗證）：
+
+    | MediaPipe | 骨頭 | 說明 |
+    |---|---|---|
+    | 0 手腕 | `GLTF_created_0_rootJoint` | 整隻手的根；`Bone_18` 是手掌骨 |
+    | 1→2 | `Bone.017_21` | 大拇指掌骨，起點在手腕，直接掛在 rootJoint 下 |
+    | 2→3 | `Bone.018_20` | |
+    | 3→4 | `Bone.019_19` | 指尖沒有骨頭，靜止指尖位置由網格估算 |
+    | 5 食指根 | `Bone.001_5` 的末端 = `Bone.005_4` 起點 | `Bone.001` 是掌骨，跟手掌一起剛體運動 |
+    | 5→6、6→7、7→8 | `Bone.005_4`、`Bone.006_3`、`Bone.007_2` | 指尖由網格估算 |
+    | 中指 9..12 | `Bone.002_9`（掌骨）、`Bone.008_8`、`Bone.009_7`、`Bone.010_6` | |
+    | 無名指 13..16 | `Bone.003_13`（掌骨）、`Bone.011_12`、`Bone.012_11`、`Bone.013_10` | |
+    | 小指 17..20 | `Bone.004_17`（掌骨）、`Bone.014_16`、`Bone.015_15`、`Bone.016_14` | |
+
+  - 驅動方式：只設定骨頭的**旋轉**，不改骨頭長度，所以模型比例永遠和原檔一致。
+    - 根：由手掌框架（across、up、normal）決定整隻手的旋轉，並用等比縮放讓手掌長度對應 `HAND_PARAMS.worldScale` 下的大小。
+    - 手掌骨和四根掌骨保持靜止姿勢的相對旋轉，跟手掌一起剛體運動。
+    - 每節手指骨：計算「靜止姿勢下骨頭方向」到「目前關鍵點方向」的旋轉（在父骨頭的座標系中計算，swing），依階層由近到遠套用。滾轉維持靜止姿勢，不另外計算。
+    - 最後用模型實際的大拇指尖、食指尖位置（由骨頭變換後的估算指尖）求捏合中點，把整隻手平移到游標位置。
+  - 左手：把目前的關鍵點沿手的 across 方向鏡像成右手姿勢去驅動，再把根節點的 x 縮放設為 -1。Three.js 會依矩陣行列式自動翻轉正反面，所以不需要 DoubleSide。
+  - 材質：`MeshLambertMaterial({ flatShading: true })`，`PALETTE.hand.base`；捏合時大拇指和食指末節（依 `JOINTS_0` 權重）以 vertex color 改成 glow；opacity 為 1 時 depthWrite 開啟。
+  - 不播放模型內建動畫。
+  - 移除上一版的程序化綁骨：`hand-rig.ts` 的綁骨與權重計算、`hand-rest-pose.ts`、`scripts/derive-hand-rest-pose.mjs`、`scripts/hand-model.mjs`、`public/models/low-poly-hands*.glb`，以及只有它們用到的參數。
+  - 授權標示：開場卡片與 `CREDITS.md`（Claude 已更新）改為 Cheezguzzler、Sketchfab、CC BY 4.0。
 - `CursorRenderer` 跳過 `source === 'hand'` 的游標。
 
 ### D8. 不需要真實鏡頭的驗收方法：手勢重播

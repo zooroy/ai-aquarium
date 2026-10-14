@@ -56,7 +56,7 @@ export function createOnboarding(callbacks: Omit<OnboardingCallbacks, 'changed'>
   const mouse = document.createElement('button'); mouse.textContent = '用滑鼠玩';
   for (const button of [camera,mouse]) Object.assign(button.style, { cursor: 'pointer', background: hex(PALETTE.water), border: '0', borderRadius: '12px', padding: '12px 18px', margin: '4px', color: hex(PALETTE.debugBackground), font: 'inherit' });
   const loading = document.createElement('p'); loading.textContent = '正在開啟鏡頭與載入手部追蹤…'; loading.hidden = true; loading.setAttribute('role','status');
-  const credit = document.createElement('small'); credit.textContent = '3D 手模型「Low poly hands」by Anastasiia Ku（Poly Pizza，CC BY 3.0）';
+  const credit = document.createElement('small'); credit.textContent = '3D 手模型「VR Hands: Bouldering (R) Rigged」by Cheezguzzler（Sketchfab，CC BY 4.0）';
   credit.style.display = 'block';
   card.append(text,privacy,camera,mouse,loading,credit); layer.append(card); document.body.append(layer);
   const notice = document.createElement('div'); notice.setAttribute('role','status'); notice.hidden = true;

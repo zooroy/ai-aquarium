@@ -1,120 +1,139 @@
-import { Color, Matrix4, Vector3 } from 'three';
-import { HAND_RENDER_PARAMS as p } from '../../config/params';
+import { Color, Matrix4, Quaternion, Vector3 } from 'three';
+import { HAND_RENDER_PARAMS } from '../../config/params';
 import { PALETTE } from '../../config/palette';
-export interface HandFrameAxes { across: Vector3; up: Vector3; normal: Vector3 }
-export function handFrame(joints: readonly Vector3[]): HandFrameAxes {
-  const across=joints[17].clone().sub(joints[5]).normalize();
-  if(across.lengthSq()<1e-12) across.set(1,0,0);
-  const up=joints[9].clone().sub(joints[0]); up.addScaledVector(across,-up.dot(across));
+export const ROOT_BONE='GLTF_created_0_rootJoint';
+export const PALM_BONES=['Bone_18','Bone.001_5','Bone.002_9','Bone.003_13','Bone.004_17'] as const;
+export const FINGER_BONES=[
+  ['Bone.017_21','Bone.018_20','Bone.019_19'],
+  ['Bone.005_4','Bone.006_3','Bone.007_2'],
+  ['Bone.008_8','Bone.009_7','Bone.010_6'],
+  ['Bone.011_12','Bone.012_11','Bone.013_10'],
+  ['Bone.014_16','Bone.015_15','Bone.016_14'],
+] as const;
+/** GLTFLoader sanitizes dots for animation property binding. */
+export function loadedBoneName(name:string):string {return name.replaceAll('.','');}
+export interface HandFrameAxes {across:Vector3;up:Vector3;normal:Vector3}
+export function handFrame(joints:readonly Vector3[]):HandFrameAxes {
+  const across=joints[17].clone().sub(joints[5]).normalize();if(across.lengthSq()<1e-12) across.set(1,0,0);
+  const up=joints[9].clone().sub(joints[0]);up.addScaledVector(across,-up.dot(across));
   if(up.lengthSq()<1e-12) {up.set(0,1,0);if(Math.abs(up.dot(across))>.9) up.set(0,0,1);up.addScaledVector(across,-up.dot(across));}
   up.normalize();return {across,up,normal:across.clone().cross(up).normalize()};
 }
-/** After input mirroring: thumb on screen right and palm toward camera => right hand. */
-export function handedness(joints: readonly Vector3[]): 'left'|'right' { return handFrame(joints).normal.z<0?'right':'left'; }
-export function boneSegments(fallback: readonly number[]=[]): [number,number][] {
-  return [[0,9],...Array.from({length:5},(_,f): [number,number][]=> {
-    const base=1+4*f;
-    return fallback.includes(f)?[[base,base+1],[base+1,base+3]]:[[base,base+1],[base+1,base+2],[base+2,base+3]];
-  }).flat()];
+function frameRotation(points:readonly Vector3[]):Quaternion {
+  const {across,up,normal}=handFrame(points);return new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(across,up,normal));
 }
-function segmentFrame(joints: readonly Vector3[],a:number,b:number): Matrix4 {
-  const {normal,across}=handFrame(joints), y=joints[b].clone().sub(joints[a]).normalize();
-  if(y.lengthSq()<1e-12) y.set(0,1,0);
-  let x=y.clone().cross(normal);
-  if(x.lengthSq()<1e-10) x=across.clone().addScaledVector(y,-across.dot(y));
-  x.normalize();const z=x.clone().cross(y).normalize();
-  return new Matrix4().makeBasis(x,y,z).setPosition(joints[a]);
+export function handedness(points:readonly Vector3[]):'left'|'right' {return handFrame(points).normal.z>=0?'right':'left';}
+export interface RigBone {name:string;parent:number;position:Vector3;rotation:Quaternion;scale:Vector3}
+export interface NativeRig {bones:readonly RigBone[];parentMatrix:Matrix4;restWorld:readonly Matrix4[];landmarks:readonly Vector3[];tipLocal:readonly Vector3[]}
+export function boneWorldMatrices(bones:readonly RigBone[],rotations:readonly Quaternion[],parentMatrix=new Matrix4()):Matrix4[] {
+  const world:Matrix4[]=[];
+  const visit=(i:number):Matrix4=> {
+    if(world[i]) return world[i];const bone=bones[i];
+    const parent=bone.parent<0?parentMatrix:visit(bone.parent);
+    return world[i]=parent.clone().multiply(new Matrix4().compose(bone.position,rotations[i],bone.scale));
+  };
+  bones.forEach((_,i)=>visit(i));return world;
 }
-export function restBoneFrames(joints: readonly Vector3[],fallback: readonly number[]=[]): Matrix4[] {
-  return boneSegments(fallback).map(([a,b])=>segmentFrame(joints,a,b));
+export function boneIndex(bones:readonly RigBone[],name:string):number {
+  const index=bones.findIndex(b=>loadedBoneName(b.name)===loadedBoneName(name));
+  if(index<0) throw Error(`Missing hand bone: ${name}`);return index;
 }
-export function drivenBoneFrames(rest: readonly Vector3[],current: readonly Vector3[],fallback: readonly number[]=[]): Matrix4[] {
-  const scale=current[0].distanceTo(current[9])/Math.max(rest[0].distanceTo(rest[9]),1e-9);
-  return boneSegments(fallback).map(([a,b])=>segmentFrame(current,a,b).scale(new Vector3(scale,
-    current[a].distanceTo(current[b])/Math.max(rest[a].distanceTo(rest[b]),1e-9),scale)));
+/** Terminal cap centroid, restricted to vertices influenced by that terminal bone. */
+export function estimateTip(vertices:readonly Vector3[],weights:ArrayLike<number>,indices:ArrayLike<number>,bone:number,origin:Vector3,direction:Vector3):Vector3 {
+  const candidates=vertices.filter((_,v)=>[0,1,2,3].some(k=>indices[v*4+k]===bone&&weights[v*4+k]>0));
+  if(!candidates.length) throw Error(`No tip vertices for bone ${bone}`);
+  const distances=candidates.map(v=>v.clone().sub(origin).dot(direction));
+  const max=Math.max(...distances),min=Math.min(...distances),tolerance=Math.max(1e-6,(max-min)*HAND_RENDER_PARAMS.tipCapRatio);
+  const cap=candidates.filter((_,i)=>distances[i]>=max-tolerance);
+  return cap.reduce((sum,v)=>sum.add(v),new Vector3()).divideScalar(cap.length);
 }
-const PALM_JOINTS = [0, 1, 5, 9, 13, 17] as const;
-/**
- * Re-targets tracked joints onto the model's own proportions so the mesh keeps its exact shape:
- * the palm moves rigidly (rotation + uniform scale), and each finger segment keeps its rest length,
- * only following the tracked direction (forward kinematics from the palm outward).
+export function makeNativeRig(bones:readonly RigBone[],parentMatrix:Matrix4,vertices:readonly Vector3[],indices:ArrayLike<number>,weights:ArrayLike<number>):NativeRig {
+  [...PALM_BONES,ROOT_BONE,...FINGER_BONES.flat()].forEach(name=>boneIndex(bones,name));
+  const restWorld=boneWorldMatrices(bones,bones.map(b=>b.rotation),parentMatrix);
+  const landmarks=[new Vector3().setFromMatrixPosition(restWorld[boneIndex(bones,ROOT_BONE)])],tipLocal:Vector3[]=[];
+  for(const finger of FINGER_BONES) {
+    for(const name of finger) landmarks.push(new Vector3().setFromMatrixPosition(restWorld[boneIndex(bones,name)]));
+    const index=boneIndex(bones,finger[2]),matrix=restWorld[index];
+    const origin=new Vector3().setFromMatrixPosition(matrix),direction=new Vector3(0,1,0).transformDirection(matrix);
+    const tip=estimateTip(vertices,weights,indices,index,origin,direction);
+    landmarks.push(tip);tipLocal.push(tip.clone().applyMatrix4(matrix.clone().invert()));
+  }
+  return {bones,parentMatrix,restWorld,landmarks,tipLocal};
+}
+/** Palm/metacarpals retain their authored relative rotations. */
+function palmRotations(rig:NativeRig,points:readonly Vector3[]):Quaternion[] {
+  const rotations=rig.bones.map(b=>b.rotation.clone());
+  const root=boneIndex(rig.bones,ROOT_BONE),parentRotation=new Quaternion().setFromRotationMatrix(new Matrix4().extractRotation(rig.parentMatrix));
+  const delta=frameRotation(points).multiply(frameRotation(rig.landmarks).invert());
+  rotations[root]=parentRotation.clone().invert().multiply(delta).multiply(parentRotation).multiply(rotations[root]);
+  return rotations;
+}
+/** Parent-space swing only. Translations/scales and palm/metacarpal rotations stay authored. */
+export function solveRotations(rig:NativeRig,points:readonly Vector3[]):Quaternion[] {
+  const rotations=palmRotations(rig,points);
+  for(let f=0;f<5;f++) for(let segment=0;segment<3;segment++) {
+    const index=boneIndex(rig.bones,FINGER_BONES[f][segment]),bone=rig.bones[index],id=1+f*4+segment;
+    const worlds=boneWorldMatrices(rig.bones,rotations,rig.parentMatrix);
+    const currentParent=bone.parent<0?rig.parentMatrix:worlds[bone.parent];
+    const restParent=bone.parent<0?rig.parentMatrix:rig.restWorld[bone.parent];
+    const restDirection=rig.landmarks[id+1].clone().sub(rig.landmarks[id]).transformDirection(restParent.clone().invert());
+    const direction=points[id+1].clone().sub(points[id]);
+    if(direction.lengthSq()<1e-12) continue;
+    direction.transformDirection(currentParent.clone().invert());
+    rotations[index]=new Quaternion().setFromUnitVectors(restDirection,direction).multiply(bone.rotation);
+  }
+  return rotations;
+}
+export function actualLandmarks(rig:NativeRig,worlds:readonly Matrix4[]):Vector3[] {
+  const result=[new Vector3().setFromMatrixPosition(worlds[boneIndex(rig.bones,ROOT_BONE)])];
+  FINGER_BONES.forEach((finger,f)=>{
+    finger.forEach(name=>result.push(new Vector3().setFromMatrixPosition(worlds[boneIndex(rig.bones,name)])));
+    result.push(rig.tipLocal[f].clone().applyMatrix4(worlds[boneIndex(rig.bones,finger[2])]));
+  });return result;
+}
+/** MediaPipe depth is negative toward the camera; scene depth is positive toward it.
+ * Reflect relative to the wrist, preserving the input translation and all lengths.
  */
-export function articulateJoints(rest: readonly Vector3[], current: readonly Vector3[]): Vector3[] {
-  const from = handFrame(rest), to = handFrame(current);
-  const rotation = new Matrix4().makeBasis(to.across, to.up, to.normal)
-    .multiply(new Matrix4().makeBasis(from.across, from.up, from.normal).transpose());
-  const scale = current[0].distanceTo(current[9]) / Math.max(rest[0].distanceTo(rest[9]), 1e-9);
-  const place = (point: Vector3) => point.clone().sub(rest[0]).applyMatrix4(rotation).multiplyScalar(scale).add(current[0]);
-  const joints = rest.map((point) => point.clone());
-  for (const id of PALM_JOINTS) joints[id] = place(rest[id]);
-  for (let finger = 0; finger < 5; finger++) {
-    const base = 1 + finger * 4;
-    for (let id = base + 1; id <= base + 3; id++) {
-      const direction = current[id].clone().sub(current[id - 1]);
-      // Degenerate tracking keeps the rest direction carried by the palm rotation.
-      if (direction.lengthSq() < 1e-12) direction.copy(rest[id].clone().sub(rest[id - 1]).applyMatrix4(rotation));
-      joints[id] = joints[id - 1].clone().addScaledVector(direction.normalize(), rest[id].distanceTo(rest[id - 1]) * scale);
-    }
-  }
-  return joints;
+export function cameraFacingLandmarks(points:readonly Vector3[]):Vector3[] {
+  return points.map(point=>new Vector3(point.x,point.y,2*points[0].z-point.z));
 }
-export function deformationMatrices(rest: readonly Vector3[],current: readonly Vector3[],fallback: readonly number[]=[]): Matrix4[] {
-  const bind=restBoneFrames(rest,fallback);
-  return drivenBoneFrames(rest,current,fallback).map((matrix,i)=>matrix.multiply(bind[i].invert()));
+/** Independent forward construction: rigid model roots + observed segment directions
+ * at authored lengths. It does not read the solved finger transforms.
+ */
+export function retargetLandmarks(rig:NativeRig,points:readonly Vector3[]):Vector3[] {
+  const palmWorld=boneWorldMatrices(rig.bones,palmRotations(rig,points),rig.parentMatrix);
+  const targets=[new Vector3().setFromMatrixPosition(palmWorld[boneIndex(rig.bones,ROOT_BONE)])];
+  FINGER_BONES.forEach((finger,f)=>{
+    targets.push(new Vector3().setFromMatrixPosition(palmWorld[boneIndex(rig.bones,finger[0])]));
+    for(let k=0;k<3;k++) {
+      const id=1+f*4+k;
+      const direction=points[id+1].clone().sub(points[id]);
+      if(direction.lengthSq()<1e-12) direction.copy(rig.landmarks[id+1]).sub(rig.landmarks[id]);
+      targets.push(targets[id].clone().addScaledVector(direction.normalize(),rig.landmarks[id].distanceTo(rig.landmarks[id+1])));
+    }
+  });
+  return targets;
 }
-function segmentDistance(point: Vector3,a: Vector3,b: Vector3): number {
-  const d=b.clone().sub(a),t=Math.max(0,Math.min(1,point.clone().sub(a).dot(d)/Math.max(d.lengthSq(),1e-12)));
-  return point.distanceTo(a.clone().addScaledVector(d,t));
+export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,left=handedness(input)==='left') {
+  const points=cameraFacingLandmarks(input);
+  const orientation=left?frameRotation(points):new Quaternion();
+  const inverse=orientation.clone().invert(),origin=points[0];
+  // Reflection in across becomes local X reflection in this outer frame.
+  const drivePoints=points.map(p=>{const v=p.clone().sub(origin).applyQuaternion(inverse);if(left)v.x=-v.x;return v;});
+  const rotations=solveRotations(rig,drivePoints),worlds=boneWorldMatrices(rig.bones,rotations,rig.parentMatrix);
+  const landmarks=actualLandmarks(rig,worlds);
+  const targets=retargetLandmarks(rig,drivePoints);
+  const scale=points[0].distanceTo(points[9])/rig.landmarks[0].distanceTo(rig.landmarks[9]);
+  const placement=new Matrix4().compose(new Vector3(),orientation,new Vector3(left?-scale:scale,scale,scale));
+  const midpoint=landmarks[4].clone().add(landmarks[8]).multiplyScalar(.5).applyMatrix4(placement);
+  placement.setPosition(target.clone().sub(midpoint));
+  return {rotations,placement,landmarks:landmarks.map(v=>v.applyMatrix4(placement)),targets:targets.map(v=>v.applyMatrix4(placement))};
 }
-export function skinWeights(positions: ArrayLike<number>,rest: readonly Vector3[],fallback: readonly number[]=[]): {indices:Uint16Array; weights:Float32Array} {
-  const segments=boneSegments(fallback), indices=new Uint16Array(positions.length/3*4),weights=new Float32Array(indices.length);
-  const frame=handFrame(rest);
-  const roots=[5,9,13,17].map(id=>({x:rest[id].dot(frame.across),y:rest[id].dot(frame.up)}));
-  const thumbX=rest[1].dot(frame.across),thumbY=rest[1].dot(frame.up);
-  const thumbDirection=rest[2].clone().sub(rest[1]);
-  for(let v=0;v<positions.length/3;v++) {
-    // Weld-equivalent locations receive identical weights even at split triangle seams.
-    const point=new Vector3(...[0,1,2].map(k=>Math.round(positions[v*3+k]*1e7)/1e7) as [number,number,number]);
-    const x=point.dot(frame.across),y=point.dot(frame.up);
-    let top=roots[x<roots[0].x?0:3].y;
-    for(let r=0;r<3;r++) if(x>=roots[r].x&&x<=roots[r+1].x) {
-      const t=(x-roots[r].x)/Math.max(roots[r+1].x-roots[r].x,1e-9);
-      top=roots[r].y+(roots[r+1].y-roots[r].y)*t;
-    }
-    // A spatial palm mask takes precedence over nearest-segment distance.
-    // In particular, neither wrist corner may be pulled by the thumb.
-    if(y<=top && (x>=thumbX || y<=thumbY)) {
-      weights[v*4]=1;continue;
-    }
-    const thumbT=point.clone().sub(rest[1]).dot(thumbDirection)/thumbDirection.lengthSq();
-    if(y<=top && x<thumbX && thumbT<=1) {
-      const amount=Math.max(0,Math.min(1,thumbT));
-      const thumbWeight=amount*amount*(3-2*amount);
-      const thumbFirst=thumbWeight>.5;
-      indices[v*4]=thumbFirst?1:0;indices[v*4+1]=thumbFirst?0:1;
-      weights[v*4]=thumbFirst?thumbWeight:1-thumbWeight;weights[v*4+1]=1-weights[v*4];continue;
-    }
-    const distances=segments.map(([a,b],i)=>({i,d:segmentDistance(point,rest[a],rest[b])})).sort((a,b)=>a.d-b.d);
-    const first=distances[0]; const [a,b]=segments[first.i];
-    const adjacent=distances.find(other=>other.i!==first.i&&(
-      segments[other.i].some(id=>id===a||id===b)
-      || (first.i===0 && (segments[other.i][0]-1)%4===0)
-      || (other.i===0 && (a-1)%4===0)));
-    let blend=0;
-    if(adjacent) {
-      const length=rest[a].distanceTo(rest[b]);
-      blend=.5*Math.max(0,1-(adjacent.d-first.d)/Math.max(length*p.skinBlend,1e-9));
-    }
-    indices[v*4]=first.i;indices[v*4+1]=adjacent?.i??first.i;
-    weights[v*4]=1-blend;weights[v*4+1]=blend;
-  }
-  return {indices,weights};
-}
-export function writeRigColors(colors: Float32Array,indices: Uint16Array,weights: Float32Array,pressed:boolean,fallback:readonly number[]=[]): void {
-  const segments=boneSegments(fallback),base=new Color(PALETTE.hand.base),glow=new Color(PALETTE.hand.glow);
+export function writeNativeColors(colors:Float32Array,indices:ArrayLike<number>,weights:ArrayLike<number>,bones:readonly RigBone[],pressed:boolean):void {
+  const tips=[boneIndex(bones,FINGER_BONES[0][2]),boneIndex(bones,FINGER_BONES[1][2])];
+  const base=new Color(PALETTE.hand.base),glow=new Color(PALETTE.hand.glow);
   for(let v=0;v<colors.length/3;v++) {
-    let amount=0;
-    if(pressed) for(let k=0;k<4;k++) if([4,8].includes(segments[indices[v*4+k]][1])) amount+=weights[v*4+k];
-    const color=base.clone().lerp(glow,amount);colors.set([color.r,color.g,color.b],v*3);
+    let amount=0;if(pressed) for(let k=0;k<4;k++) if(tips.includes(indices[v*4+k])) amount+=weights[v*4+k];
+    const color=base.clone().lerp(glow,Math.min(1,amount));colors.set([color.r,color.g,color.b],v*3);
   }
 }
