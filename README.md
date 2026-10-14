@@ -2,7 +2,7 @@
 
 一座在瀏覽器裡的 Cozy Low Poly 3D 魚缸。對著鏡頭伸出手，捏合手指就能抓起小魚；也可以自己畫一條魚放進魚缸，或用手機掃 QR code，把在手機上畫的魚送進桌電的魚缸。
 
-**線上展示：https://zooroy.github.io/ai-aquarium/**
+**線上展示：<https://zooroy.github.io/ai-aquarium/>**
 
 - 桌電：可以開鏡頭用手勢玩，或直接用滑鼠玩。
 - 手機：用桌電魚缸上「用手機畫」的 QR code 開啟。
@@ -164,7 +164,7 @@ npm run build
 
 ## 專案結構
 
-```
+```text
 src/
 ├── config/      可調參數與色票
 ├── core/        亂數、魚缸邊界、裝置判斷等純函式
