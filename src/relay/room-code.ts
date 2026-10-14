@@ -39,3 +39,8 @@ export function loadRoomCode(storage: CodeStorage | undefined, randomBytes: (len
   try { storage?.setItem(STORAGE_KEY, code); } catch (error) { console.warn('無法保存魚缸代碼', error); }
   return code;
 }
+
+/** The URL encoded in the tank's QR code; `mode=draw` makes tablets open the drawing page too. */
+export function phonePairUrl(origin: string, room: string): string {
+  return `${origin}/?mode=draw&room=${encodeURIComponent(room)}`;
+}

@@ -58,15 +58,15 @@
 
 ## 4. 桌電配對與接收
 
-- [ ] 4.1 實作 `src/ui/phone-pair-panel.ts`，並在 `fish-menu` 加上「用手機畫」按鈕（D6）。驗證方式：typecheck 和 build 通過；由 Claude 截圖，並確認 QR code 能被手機掃描。
-- [ ] 4.2 在 `custom-fish-feature.ts` 加入 `receive(id, png)` 與 inbox 整合，包括收到時的提示和等待中的提示（D5）。驗證方式：
+- [x] 4.1 實作 `src/ui/phone-pair-panel.ts`，並在 `fish-menu` 加上「用手機畫」按鈕（D6）。驗證方式：typecheck 和 build 通過；由 Claude 截圖，並確認 QR code 能被手機掃描。
+- [x] 4.2 在 `custom-fish-feature.ts` 加入 `receive(id, png)` 與 inbox 整合，包括收到時的提示和等待中的提示（D5）。驗證方式：
   - 單元測試或可注入的測試，涵蓋 `receive` 的四種情況：重複 id、已滿、解碼失敗、成功。
   - 等待中的提示從無變有時只出現一次。
   - typecheck 和 build 通過。
 
 ## 5. 驗收與部署
 
-- [ ] 5.1 **[Claude]** 本機端到端驗收，用 `npm run dev` 加上 `npm run dev:worker`：
+- [x] 5.1 **[Claude]** 本機端到端驗收，用 `npm run dev` 加上 `npm run dev:worker`：
   - 以手機模擬的分頁送魚，桌電分頁 10 秒內收到；重新整理後只有一隻。
   - 已滿 20 隻時的等待提示，刪除一隻後等待的魚會進來。
   - 關掉 worker 時，魚缸照常動，手機頁顯示離線說明。

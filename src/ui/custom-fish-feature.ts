@@ -4,17 +4,40 @@ import type { TankBounds } from '../core/tank-bounds';
 import type { CustomFishRenderer } from '../render/fish/custom-fish-renderer';
 import { canAddCustomFish, removeCustomFish, spawnCustomFish } from '../simulation/custom-fish';
 import type { Fish } from '../simulation/fish-state';
+import { createFishInbox } from '../relay/fish-inbox';
+import type { ReceiveResult } from '../relay/fish-inbox';
+import { createRelayClient } from '../relay/relay-client';
+import type { RelayClient } from '../relay/relay-client';
+import { loadRoomCode, phonePairUrl } from '../relay/room-code';
 import { createStore } from '../storage/custom-fish-store';
 import type { CustomFishRecord, CustomFishStore } from '../storage/custom-fish-store';
 import { createDrawingPanel } from './drawing-panel';
 import { createFishMenu } from './fish-menu';
 import { createMyFishPanel } from './my-fish-panel';
 import { createNotice } from './notice';
+import { createPhonePairPanel } from './phone-pair-panel';
 
 export const CUSTOM_FISH_MESSAGES = {
   limit: '最多 20 隻自訂魚，請先在「我的魚」刪除一隻。',
   notSaved: '這隻魚不會被保存：目前無法使用瀏覽器儲存空間。',
+  received: '收到一隻從手機來的魚！',
+  waiting: '有手機送來的魚在等待，請先在「我的魚」刪除一隻。',
 } as const;
+
+/** What to do with a fish arriving from the relay, before any decoding. */
+export function receiveAction(alreadyLoaded: boolean, canAdd: boolean): 'duplicate' | 'full' | 'place' {
+  if (alreadyLoaded) return 'duplicate';
+  return canAdd ? 'place' : 'full';
+}
+
+/** Calls `show` only when the value turns from false to true. */
+export function createRisingEdge(show: () => void) {
+  let previous = false;
+  return (value: boolean) => {
+    if (value && !previous) show();
+    previous = value;
+  };
+}
 
 export interface CustomFishFeatureContext {
   fish: Fish[];
@@ -25,6 +48,8 @@ export interface CustomFishFeatureContext {
   setGrabEnabled(enabled: boolean): void;
   /** Injectable for tests or fallbacks; defaults to IndexedDB with memory fallback. */
   openStore?: () => Promise<{ store: CustomFishStore; persistent: boolean }>;
+  /** Injectable relay; defaults to the same-origin /api client and this device's saved room code. */
+  relay?: { client: Pick<RelayClient, 'list' | 'download' | 'remove'>; room: string };
 }
 
 interface Loaded { id: string; image: HTMLImageElement; url: string }
@@ -57,9 +82,19 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
       drawing.open();
     },
     list: () => myFish.open([...loaded.values()].map(({ id, image }) => ({ id, image }))),
+    pair: () => pairPanel.open(),
   });
   const drawing = createDrawingPanel({ openChanged: panelChanged, submit: (png) => { void add(png); } });
   const myFish = createMyFishPanel({ openChanged: panelChanged, remove: (id) => remove(id) });
+  const relay = ctx.relay ?? { client: createRelayClient(), room: loadRoomCode(safeLocalStorage()) };
+  const pairPanel = createPhonePairPanel(phonePairUrl(location.origin, relay.room), { openChanged: panelChanged });
+  const showWaiting = createRisingEdge(() => notice.showNotice(CUSTOM_FISH_MESSAGES.waiting));
+  const inbox = createFishInbox({
+    client: relay.client, room: relay.room, receive: (id, png) => receive(id, png),
+    isVisible: () => document.visibilityState === 'visible', onWaiting: showWaiting,
+  });
+  const onVisibility = () => { if (document.visibilityState === 'visible') inbox.poke(); };
+  document.addEventListener('visibilitychange', onVisibility);
 
   function nextId(): number {
     return ctx.fish.reduce((max, item) => Math.max(max, item.id), -1) + 1;
@@ -77,6 +112,33 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     return true;
   }
 
+  /** Saves a placed record; returns false (after the notice) when it will not persist. */
+  async function save(record: CustomFishRecord): Promise<boolean> {
+    if (!store || !persistent) { notice.showNotice(CUSTOM_FISH_MESSAGES.notSaved); return false; }
+    try { await store.add(record); return true; } catch (error) {
+      console.warn('自訂魚保存失敗', error);
+      notice.showNotice(CUSTOM_FISH_MESSAGES.notSaved);
+      return false;
+    }
+  }
+
+  /** A fish from the phone relay. The relay id becomes the local id, so a failed remote delete never duplicates it. */
+  async function receive(id: string, png: Blob): Promise<ReceiveResult> {
+    const action = receiveAction(loaded.has(id), canAddCustomFish(ctx.fish));
+    if (action === 'duplicate') return 'placed';
+    if (action === 'full') return 'full';
+    const record: CustomFishRecord = { id, createdAt: Date.now(), template: 'default', png };
+    try {
+      // place() declines when the id appeared meanwhile (done) or the tank filled up / closed (keep waiting).
+      if (!(await place(record))) return loaded.has(id) ? 'placed' : 'full';
+    } catch (error) {
+      console.warn('手機魚圖片無法讀取', error);
+      return 'invalid';
+    }
+    if (await save(record)) notice.showNotice(CUSTOM_FISH_MESSAGES.received);
+    return 'placed';
+  }
+
   async function add(png: Blob): Promise<void> {
     if (!canAddCustomFish(ctx.fish)) { notice.showNotice(CUSTOM_FISH_MESSAGES.limit); return; }
     const record: CustomFishRecord = { id: crypto.randomUUID(), createdAt: Date.now(), template: 'default', png };
@@ -86,11 +148,7 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
       console.warn('自訂魚載入失敗', error);
       return;
     }
-    if (!store || !persistent) { notice.showNotice(CUSTOM_FISH_MESSAGES.notSaved); return; }
-    try { await store.add(record); } catch (error) {
-      console.warn('自訂魚保存失敗', error);
-      notice.showNotice(CUSTOM_FISH_MESSAGES.notSaved);
-    }
+    await save(record);
   }
 
   function remove(id: string): void {
@@ -114,6 +172,8 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     } catch (error) {
       console.warn('自訂魚清單讀取失敗', error);
     }
+    // Start after local fish load, so the 20-fish limit sees them before any phone fish arrives.
+    if (!disposed) inbox.start();
   })();
 
   return {
@@ -122,9 +182,14 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     get count(): number { return customCount(); },
     dispose(): void {
       disposed = true;
-      drawing.dispose(); myFish.dispose(); menu.dispose(); notice.dispose();
+      inbox.stop(); document.removeEventListener('visibilitychange', onVisibility);
+      drawing.dispose(); myFish.dispose(); pairPanel.dispose(); menu.dispose(); notice.dispose();
       for (const { url } of loaded.values()) URL.revokeObjectURL(url);
       loaded.clear();
     },
   };
+}
+
+function safeLocalStorage(): Storage | undefined {
+  try { return globalThis.localStorage; } catch { return undefined; }
 }
