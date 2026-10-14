@@ -157,6 +157,16 @@ export const ONBOARDING_PARAMS = {
   noticeRadius: 12,
 } as const;
 
+/** 畫圖面板、我的魚清單與右上角按鈕的版面數值（px）。 */
+export const DRAWING_UI_PARAMS = {
+  outlineWidth: 2.5, // 以 512 寬貼圖為基準的輪廓線寬度。
+  panelMaxWidth: 640,
+  thumbnailWidth: 160,
+  swatchSize: 30,
+  menuInset: 16,
+  zIndex: 30,
+} as const;
+
 /** Drawing uses normalized UV coordinates; brush diameters are texture pixels. */
 export const CUSTOM_FISH_PARAMS = {
   levels: 6,

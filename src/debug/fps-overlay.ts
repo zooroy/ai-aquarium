@@ -47,7 +47,8 @@ export function createFpsOverlay(search: string, doc?: Document) {
     if (fps !== undefined) { fpsText = `FPS: ${fps.toFixed(1)}`; refresh(); }
   }, setDetection(stats: DetectionStats | undefined) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState, side?:HandSide|null) {
     const hand = state.pointers.find((pointer) => pointer.source === 'hand');
-    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}｜手:${hand ? (hand.pressed ? '捏住' : '張開') + (side ? `(${side==='right'?'右':'左'})` : '(未定)') : '無'}`;
+    const custom = fish.filter((item) => item.customId !== undefined).length;
+    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}${custom > 0 ? `｜自訂魚：${custom}` : ''}｜手:${hand ? (hand.pressed ? '捏住' : '張開') + (side ? `(${side==='right'?'右':'左'})` : '(未定)') : '無'}`;
     if (next !== interaction) { interaction = next; refresh(); }
   }, dispose() { element.remove(); } };
 }

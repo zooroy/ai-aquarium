@@ -18,6 +18,8 @@ export interface OnboardingCallbacks {
   ingest(frame: HandFrame | null, now: number): void;
   report(stats: DetectionStats | undefined): void;
   clearHand(): void;
+  /** Called once the card has closed (mouse or camera mode); may be called more than once. */
+  finished?(): void;
 }
 /** 可注入控制器，DOM 僅訂閱狀態；載入完成後仍持有 session 供 dispose。 */
 export function createOnboardingController(callbacks: OnboardingCallbacks, deps?: CameraDependencies) {
@@ -65,6 +67,7 @@ export function createOnboarding(callbacks: Omit<OnboardingCallbacks, 'changed'>
     layer.style.display = state === 'choosing' || state === 'loading' ? 'grid' : 'none';
     loading.hidden = state !== 'loading'; camera.disabled = mouse.disabled = state === 'loading';
     notice.showNotice(message);
+    if (state === 'mouse' || state === 'camera') callbacks.finished?.();
   } });
   camera.addEventListener('click', () => controller.camera()); mouse.addEventListener('click', () => controller.mouse());
   return { dispose() { controller.dispose(); layer.remove(); notice.dispose(); } };
