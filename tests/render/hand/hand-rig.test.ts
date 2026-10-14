@@ -51,8 +51,8 @@ it('colors only vertices influenced by thumb/index terminal joints without repla
   const tips=[boneIndex(rig.bones,FINGER_BONES[0][2]),boneIndex(rig.bones,FINGER_BONES[1][2])];
   for(let v=0;v<fixture.vertices.length;v++) if(![0,1,2,3].some(k=>tips.includes(fixture.indices[v*4+k])&&fixture.weights[v*4+k]>0)) expect(colors.slice(v*3,v*3+3)).toEqual(base.slice(v*3,v*3+3));
 });
-it.each([1000,5000])('aligns retargeted targets and faces pinch tips toward the camera at %sms, including mirrored hands',async(time)=>{
-  const {handFrame,cameraFacingLandmarks}=await import('../../../src/render/hand/hand-rig');
+it.each([1000,5000])('aligns retargeted targets and bends first-person pinch tips away from the camera at %sms, including mirrored hands',async(time)=>{
+  const {handFrame,firstPersonLandmarks}=await import('../../../src/render/hand/hand-rig');
   const frame=createReplaySource(getReplayScript('demo')).frameAt(time)!;
   for(const mirror of [false,true]) {
     // Same coordinate conversion as HandProvider: x/y mirrored, z still MediaPipe depth.
@@ -60,10 +60,10 @@ it.each([1000,5000])('aligns retargeted targets and faces pinch tips toward the 
     const original=points.map(p=>p.clone()),target=new Vector3(.4,-.2,2.5);
     const result=drivePose(rig,points,target),palmLength=points[0].distanceTo(points[9]);
     result.landmarks.forEach((point,i)=>expect(point.distanceTo(result.targets[i])).toBeLessThan(palmLength*.05));
-    expect(handFrame(result.landmarks).normal.dot(handFrame(points).normal)).toBeGreaterThan(.9);
+    expect(handFrame(result.landmarks).normal.dot(handFrame(firstPersonLandmarks(points)).normal)).toBeGreaterThan(.9);
     expect(result.landmarks[4].clone().add(result.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
     // Check direction and length independently of the solved rotations and the debug points.
-    const corrected=cameraFacingLandmarks(points);
+    const corrected=firstPersonLandmarks(points);
     const scale=palmLength/rig.landmarks[0].distanceTo(rig.landmarks[9]);
     for(let f=0;f<5;f++) for(let k=0;k<3;k++) {
       const id=1+4*f+k,direction=result.targets[id+1].clone().sub(result.targets[id]);
@@ -72,10 +72,34 @@ it.each([1000,5000])('aligns retargeted targets and faces pinch tips toward the 
     }
     if(time===5000) {
       const palmCenter=[0,5,9,13,17].reduce((sum,i)=>sum.add(result.landmarks[i]),new Vector3()).divideScalar(5);
-      expect(result.landmarks[4].z).toBeGreaterThan(palmCenter.z);
-      expect(result.landmarks[8].z).toBeGreaterThan(palmCenter.z);
+      expect(result.landmarks[4].z).toBeLessThan(palmCenter.z);
+      expect(result.landmarks[8].z).toBeLessThan(palmCenter.z);
       expect(result.landmarks[4].distanceTo(result.landmarks[8])).toBeLessThan(palmLength*.25);
     }
     expect(points).toEqual(original);
+  }
+});
+it('shows the back of the right hand with thumb on the left, mirroring only the left hand',async()=>{
+  const {firstPersonLandmarks,handedness,handFrame}=await import('../../../src/render/hand/hand-rig');
+  const frame=createReplaySource(getReplayScript('demo')).frameAt(1000)!;
+  for(const left of [false,true]) {
+    const input=frame.worldLandmarks.map(p=>new Vector3(left?p.x:-p.x,-p.y,p.z));
+    const shape=firstPersonLandmarks(input);
+    expect(handedness(shape)).toBe(left?'left':'right');
+    const target=new Vector3(.4,.1,2.5),driven=drivePose(rig,input,target);
+    expect(Math.sign(driven.placement.determinant())).toBe(left?-1:1);
+    const thumbSide=driven.landmarks[4].x-driven.landmarks[9].x;
+    expect(left?thumbSide:-thumbSide).toBeGreaterThan(0);
+    const worlds=boneWorldMatrices(rig.bones,driven.rotations,rig.parentMatrix);
+    const root=boneIndex(rig.bones,ROOT_BONE);
+    // Anatomical dorsal normal in the authored right-hand frame, transformed
+    // as a surface normal (not the cross-product pseudovector after mirroring).
+    const deformation=driven.placement.clone().multiply(worlds[root]).multiply(rig.restWorld[root].clone().invert());
+    const {Matrix3}=await import('three');
+    const backNormal=handFrame(rig.landmarks).normal.applyMatrix3(new Matrix3().getNormalMatrix(deformation)).normalize();
+    expect(backNormal.z).toBeGreaterThan(.9);
+    const moved=drivePose(rig,input,new Vector3(target.x+1,target.y,target.z));
+    driven.landmarks.forEach((point,i)=>expect(moved.landmarks[i].clone().sub(point).distanceTo(new Vector3(1,0,0))).toBeLessThan(1e-10));
+    expect(driven.landmarks[4].clone().add(driven.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
   }
 });

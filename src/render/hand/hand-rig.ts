@@ -91,11 +91,19 @@ export function actualLandmarks(rig:NativeRig,worlds:readonly Matrix4[]):Vector3
     result.push(rig.tipLocal[f].clone().applyMatrix4(worlds[boneIndex(rig.bones,finger[2])]));
   });return result;
 }
-/** MediaPipe depth is negative toward the camera; scene depth is positive toward it.
- * Reflect relative to the wrist, preserving the input translation and all lengths.
+/** Provider already mirrors x for cursor movement and retains camera-space depth.
+ * First convert that mirrored camera view to scene depth, then rotate its shape
+ * 180 degrees around vertical (x and z together), about the wrist. This is a
+ * rotation of the view, not another handedness-changing reflection. Translation
+ * is applied separately by drivePose, so cursor movement is unchanged.
  */
-export function cameraFacingLandmarks(points:readonly Vector3[]):Vector3[] {
-  return points.map(point=>new Vector3(point.x,point.y,2*points[0].z-point.z));
+export function firstPersonLandmarks(points:readonly Vector3[]):Vector3[] {
+  const wrist=points[0];
+  return points.map(point=> {
+    const cameraView=point.clone().sub(wrist);cameraView.z=-cameraView.z;
+    cameraView.x=-cameraView.x;cameraView.z=-cameraView.z;
+    return cameraView.add(wrist);
+  });
 }
 /** Independent forward construction: rigid model roots + observed segment directions
  * at authored lengths. It does not read the solved finger transforms.
@@ -114,8 +122,9 @@ export function retargetLandmarks(rig:NativeRig,points:readonly Vector3[]):Vecto
   });
   return targets;
 }
-export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,left=handedness(input)==='left') {
-  const points=cameraFacingLandmarks(input);
+export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,left?:boolean) {
+  const points=firstPersonLandmarks(input);
+  left ??= handedness(points)==='left';
   const orientation=left?frameRotation(points):new Quaternion();
   const inverse=orientation.clone().invert(),origin=points[0];
   // Reflection in across becomes local X reflection in this outer frame.

@@ -104,7 +104,7 @@ it('places orange retarget markers over actual driven joints after pinch alignme
     expect(actual[4].clone().add(actual[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-5);
     if(time===5000) {
       const center=[0,5,9,13,17].reduce((v,i)=>v.add(actual[i]),new Vector3()).divideScalar(5);
-      expect(actual[4].z).toBeGreaterThan(center.z);expect(actual[8].z).toBeGreaterThan(center.z);
+      expect(actual[4].z).toBeLessThan(center.z);expect(actual[8].z).toBeLessThan(center.z);
     }
   }
   avatar.dispose();

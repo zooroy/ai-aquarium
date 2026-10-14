@@ -243,6 +243,7 @@ fleeTime: number;    // 進入 fleeing 後經過的秒數
   - 左手：把目前的關鍵點沿手的 across 方向鏡像成右手姿勢去驅動，再把根節點的 x 縮放設為 -1。Three.js 會依矩陣行列式自動翻轉正反面，所以不需要 DoubleSide。
   - 材質：`MeshLambertMaterial({ flatShading: true })`，`PALETTE.hand.base`；捏合時大拇指和食指末節（依 `JOINTS_0` 權重）以 vertex color 改成 glow；opacity 為 1 時 depthWrite 開啟。
   - 不播放模型內建動畫。
+  - 第一人稱視角（使用者回饋「跟鏡子的反射一樣，我要跟實際的手一樣」後修正）：手的**位置**仍沿用鏡像後的游標，往右移動畫面就往右；但手的**形狀**改成「鏡像 x 加上反轉深度 z」，相當於把原始鏡頭座標繞垂直軸轉 180 度。這是旋轉不是反射，所以左右手不會對調：右手驅動右手模型、不鏡像，左手才用鏡像的右手模型；掌心朝鏡頭時，畫面上看到的是手背。左右手的判斷要以這個轉換後的座標為準。
   - 移除上一版的程序化綁骨：`hand-rig.ts` 的綁骨與權重計算、`hand-rest-pose.ts`、`scripts/derive-hand-rest-pose.mjs`、`scripts/hand-model.mjs`、`public/models/low-poly-hands*.glb`，以及只有它們用到的參數。
   - 授權標示：開場卡片與 `CREDITS.md`（Claude 已更新）改為 Cheezguzzler、Sketchfab、CC BY 4.0。
 - `CursorRenderer` 跳過 `source === 'hand'` 的游標。
