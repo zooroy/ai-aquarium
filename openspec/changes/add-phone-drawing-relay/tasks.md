@@ -5,26 +5,29 @@
 
 ## 0. 準備
 
-- [x] 0.1 **[Claude]** 安裝並設定以下項目：
-  - 安裝 `uqr`（dependencies）、`wrangler` 和 `@cloudflare/workers-types`（devDependencies），版本固定。
-  - 新增 `wrangler.jsonc`（D1）、`worker/tsconfig.json`、`vite.config.ts` 的 `/api` proxy（D7）。
-  - 新增 npm scripts：`dev:worker`、`deploy`；`typecheck` 改成兩個 tsconfig 都檢查。
-  - `.gitignore` 加上 `.wrangler/`。
+- [x] 0.1 **[Claude]** （已被 0.2 取代）安裝 `uqr`、`wrangler` 和 workers-types，並加入 Cloudflare 的設定。
+- [x] 0.2 **[Claude]** 改用 GitHub Pages + Supabase 的準備工作（design D1、D7）：
+  - 移除 Cloudflare 相關的檔案、套件與 scripts。
+  - 安裝 `@electric-sql/pglite`（devDependencies），版本固定。
+  - `vite.config.ts` 加上 `base`。
+  - 新增 `.env.example`；`.gitignore` 加上 `.env.local`。
 
-  驗證方式：`npm run typecheck`、`npm test`、`npm run build` 都通過，`npx wrangler deploy --dry-run` 成功。
+  驗證方式：`npm run typecheck`、`npm test`、`npm run build` 都通過。
 
-## 1. 後端轉交 API（純邏輯）
+## 1. 後端轉交（SQL）
 
-- [x] 1.1 實作 `worker/relay.ts` 的 `handleRelay` 與 `RelayBucket`（D2），以及 `worker/index.ts` 的 R2 轉接；在 params 加入 `RELAY_PARAMS`。驗證方式：用記憶體版的假 bucket 寫單元測試 `tests/worker/relay.test.ts`，涵蓋 fish-relay spec 的每個情境：
+- [x] 1.1 **[Claude]** （已被 1.2 取代）Cloudflare Worker 版的轉交 API。
+- [ ] 1.2 撰寫 `supabase/migrations/0001_fish_relay.sql` 與 `0002_fish_relay_cron.sql`（D2）。驗證方式：寫單元測試 `tests/supabase/fish-relay.test.ts`，用 PGlite 執行 0001；測試前先建立 `anon` 角色，並以 `set role anon` 呼叫函式。涵蓋 fish-relay spec 的每個情境：
   - 房間互相隔離。
-  - 房間代碼格式錯誤時回 400。
-  - 正確的 PNG 回 201 加 id，查詢得到。
-  - JPEG、尺寸錯誤、超過 512 KB 都被拒絕，而且沒有寫入資料。
-  - 第 21 隻回 429 `room-full`。
+  - 房間代碼格式錯誤時回報 `invalid-room`。
+  - 正確的 PNG 回傳 id，查詢得到。
+  - JPEG、尺寸錯誤、超過 512 KB、base64 格式錯誤都被拒絕，而且沒有寫入資料。
+  - 第 21 隻回報 `room-full`。
   - 查詢結果由舊到新。
-  - 下載、刪除後查詢不到；刪除不存在的魚回 204。
-  - 注入的 `now` 超過 24 小時後，查詢不到，且已從 bucket 刪除；過期的魚不計入待領數量。
-  - 未知路徑回 404，方法不符回 405，所有回應都有 `Cache-Control: no-store`。
+  - 下載、刪除後查詢不到；刪除不存在的魚不會出錯。
+  - 把 `created_at` 改成 25 小時前之後，查詢不到，已被刪除，也不計入待領數量。
+  - `anon` 直接 `select` 資料表會被拒絕。
+  - SQL 裡的常數和 `RELAY_PARAMS` 一致。
 
 ## 2. 前端轉交模組（純邏輯）
 
@@ -38,7 +41,13 @@
   - `isRoomCode` 的正反例。
   - storage 已有合法代碼時沿用；沒有或不合法時產生新的並寫回。
   - storage 讀寫會丟錯時，仍回傳合法的暫時代碼。
-- [x] 2.3 實作 `src/relay/relay-client.ts`（D5）。驗證方式：用假的 `fetch` 寫單元測試，涵蓋 upload 的 201、429、400、413、500 和 TypeError 分別對應的結果；list、download、remove 的網址與方法正確，非 2xx 時丟錯。
+- [x] 2.3 實作 `src/relay/relay-client.ts`（Cloudflare 版，已被 2.5 取代）。
+- [ ] 2.5 把 `relay-client.ts` 改成呼叫 Supabase 的 RPC（D5），並把資源路徑改用 `BASE_URL`（D7）。驗證方式：用假的 `fetch` 寫單元測試，涵蓋：
+  - upload 的成功、`room-full`、`invalid-image`、500 和 TypeError 分別對應的結果。
+  - 每個呼叫的網址、headers 與 JSON body 正確。
+  - Blob 和 base64 互轉後內容相同。
+  - 非 2xx 或 `download` 回傳 null 時丟錯。
+  - 缺少環境變數時，`createRelayClientFromEnv()` 回傳 `undefined`，手機頁和魚缸都能正常處理。
 - [x] 2.4 實作 `src/relay/fish-inbox.ts`（D5）。驗證方式：用假的 client 和計時器寫單元測試：
   - `placed` 和 `invalid` 會呼叫 remove。
   - 遇到 `full` 時停止這一輪、不呼叫 remove，並呼叫 `onWaiting(true)`；下一輪沒有 `full` 時呼叫 `onWaiting(false)`。
@@ -66,16 +75,15 @@
 
 ## 5. 驗收與部署
 
-- [x] 5.1 **[Claude]** 本機端到端驗收，用 `npm run dev` 加上 `npm run dev:worker`：
-  - 以手機模擬的分頁送魚，桌電分頁 10 秒內收到；重新整理後只有一隻。
-  - 已滿 20 隻時的等待提示，刪除一隻後等待的魚會進來。
-  - 關掉 worker 時，魚缸照常動，手機頁顯示離線說明。
-  - 手機頁的網路請求中沒有 `app` chunk、`.wasm`、`.task` 或 `.glb`。
-  - 桌電畫圖面板的行為和之前相同。
-- [ ] 5.2 **[User]** 一次性的 Cloudflare 設定：
-  - 執行 `! npx wrangler login`。
-  - 在後台啟用 R2。
-  - 由 Claude 協助建立 bucket 和生命週期規則。
-- [ ] 5.3 **[Claude]** 執行 `npm run deploy`，用公開網址驗收：
-  - 桌電開啟魚缸，相機可以使用（HTTPS）。
-  - **[User]** 用真的 iPhone 掃描 QR code，畫一隻魚送出，桌電收到。
+- [x] 5.1 **[Claude]** 本機端到端驗收（Cloudflare 版，用 wrangler dev）：
+  - 送魚、收魚、重新整理不重複。
+  - 已滿時等待，刪除一隻後等待的魚會進來。
+  - 後端斷線時魚缸照常運作。
+  - 手機頁沒有載入魚缸的檔案。
+  - 桌電畫圖面板的行為不變。
+- [ ] 5.2 **[User]** 註冊 Supabase，建立免費專案，提供 Project URL 和 anon key；如果要用 CLI 套用 SQL，執行 `! npx supabase login`。
+- [ ] 5.3 **[Claude]** 套用 migration 並啟用 pg_cron，寫入 `.env.local`，然後用真正的 Supabase 重做一次 5.1 的送魚、收魚、已滿、離線檢查。
+- [ ] 5.4 **[Claude]** 建立公開 repo `zooroy/ai-aquarium`，設定 Actions variables，開啟 Pages，push 後確認 Actions 成功。用 `https://zooroy.github.io/ai-aquarium/` 驗收：
+  - 魚缸、相機（HTTPS）、手模型都正常。
+  - 手機頁正常。
+- [ ] 5.5 **[User]** 用真的 iPhone 掃描 QR code，畫一隻魚送出，桌電收到。
