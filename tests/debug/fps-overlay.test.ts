@@ -20,18 +20,20 @@ it('creates no DOM without debug, and updates/disposes the enabled overlay', () 
   overlay.dispose(); expect(element.remove).toHaveBeenCalledOnce();
 });
 
-it('shows detection fields only in camera debug mode', () => {
+it('shows detection fields only while an active camera reports stats', () => {
   for (const search of ['?debug', '?debug&camera']) {
     const element = { textContent: '', style: {}, remove: vi.fn() };
     const doc = { createElement: () => element, body: { append() {} } };
     const overlay = createFpsOverlay(search, doc as unknown as Document);
     overlay.setDetection({ hz: 25, averageMs: 8, delegate: 'CPU', detected: true });
-    if (search.includes('camera')) {
+    {
       expect(element.textContent).toContain('25.0 Hz');
       expect(element.textContent).toContain('8.0 ms');
       expect(element.textContent).toContain('CPU');
       expect(element.textContent).toContain('偵測: 有');
-    } else expect(element.textContent).toBe('FPS: —｜抓住：0｜逃走：0｜手:無');
+    }
+    overlay.setDetection(undefined);
+    expect(element.textContent).not.toContain('detect');
     overlay.dispose();
   }
 });

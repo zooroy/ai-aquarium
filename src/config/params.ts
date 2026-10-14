@@ -147,3 +147,5 @@ export const HAND_RENDER_PARAMS = {
   glowIntensity: 0.8, bubbleCount: 8, bubbleLife: 0.8,
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;
+
+export const ONBOARDING_PARAMS = { noticeSeconds: 5 } as const;
