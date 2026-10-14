@@ -15,7 +15,7 @@
 
 ## 1. 後端轉交 API（純邏輯）
 
-- [ ] 1.1 實作 `worker/relay.ts` 的 `handleRelay` 與 `RelayBucket`（D2），以及 `worker/index.ts` 的 R2 轉接；在 params 加入 `RELAY_PARAMS`。驗證方式：用記憶體版的假 bucket 寫單元測試 `tests/worker/relay.test.ts`，涵蓋 fish-relay spec 的每個情境：
+- [x] 1.1 實作 `worker/relay.ts` 的 `handleRelay` 與 `RelayBucket`（D2），以及 `worker/index.ts` 的 R2 轉接；在 params 加入 `RELAY_PARAMS`。驗證方式：用記憶體版的假 bucket 寫單元測試 `tests/worker/relay.test.ts`，涵蓋 fish-relay spec 的每個情境：
   - 房間互相隔離。
   - 房間代碼格式錯誤時回 400。
   - 正確的 PNG 回 201 加 id，查詢得到。

@@ -181,3 +181,17 @@ export const CUSTOM_FISH_PARAMS = {
   maxUndoActions: 50,
   interpolationRadiusRatio: 0.5, // Maximum point spacing = half the brush diameter.
 } as const;
+
+/** 手機畫魚的轉交後端與輪詢（Worker 也會 import，所以這個檔案不能有任何 import）。 */
+export const RELAY_PARAMS = {
+  pollIntervalMs: 5000,
+  maxPending: 20, // 每個房間最多待領幾隻。
+  maxPngBytes: 512 * 1024,
+  expireMs: 24 * 60 * 60 * 1000,
+  roomCodeBytes: 16, // 128 位元，base64url 後為 22 字元。
+} as const;
+
+/** 觸控且螢幕短邊小於這個值（CSS px）的裝置視為手機，只顯示畫圖頁。 */
+export const DEVICE_PARAMS = {
+  phoneMaxShortSide: 600,
+} as const;
