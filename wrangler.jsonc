@@ -1,0 +1,14 @@
+{
+  // 一個 Worker 同時提供網頁（dist/）和 /api 轉交 API（design.md D1）。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-aquarium",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "run_worker_first": ["/api/*"]
+  },
+  "r2_buckets": [
+    { "binding": "FISH", "bucket_name": "ai-aquarium-fish" }
+  ]
+}
