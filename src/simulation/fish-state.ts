@@ -6,7 +6,9 @@ import type { TankBounds } from '../core/tank-bounds';
 
 export interface Fish {
   customId?: string;
-  mode: 'swimming' | 'grabbed' | 'fleeing';
+  /** dropping/leaving are scripted custom-fish transitions that boids and grabbing ignore. */
+  mode: 'swimming' | 'grabbed' | 'fleeing' | 'dropping' | 'leaving';
+  transition?: FishTransition;
   panic: number;
   fleeTime: number;
   id: number;
@@ -16,6 +18,19 @@ export interface Fish {
   variant: number; // 配色索引。
   scale: number;
   phase: number;
+}
+
+export interface FishTransition {
+  elapsed: number;
+  /** Only used while dropping. */
+  startY: number;
+  targetY: number;
+  /** Unit vector: the swim direction after landing, or ±x while leaving. */
+  direction: Vector3;
+}
+
+export function isTransitioning(fish: Pick<Fish, 'mode'>): boolean {
+  return fish.mode === 'dropping' || fish.mode === 'leaving';
 }
 
 export function createSchool(count: number, bounds: TankBounds, random: Random): Fish[] {

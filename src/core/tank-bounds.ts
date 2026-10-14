@@ -36,3 +36,13 @@ export function computeTankBounds({ fovDeg, cameraZ, aspect }: TankBoundsOptions
     },
   };
 }
+
+/** World y of the screen's top edge at depth z (camera on the z axis, looking at the origin, vertical FOV). */
+export function visibleTopY(fovDeg: number, cameraY: number, cameraZ: number, z: number): number {
+  return cameraY + Math.tan(fovDeg * Math.PI / 360) * (cameraZ - z);
+}
+
+/** Half the visible world width at depth z; aspect is width / height. */
+export function visibleHalfWidth(fovDeg: number, cameraZ: number, aspect: number, z: number): number {
+  return Math.tan(fovDeg * Math.PI / 360) * (cameraZ - z) * aspect;
+}

@@ -4,6 +4,7 @@ import { FISH_PARAMS as params, GRAB_PARAMS } from '../config/params';
 import { createRandom } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 import type { Pointer } from '../input/types';
+import { isTransitioning } from './fish-state';
 import type { Fish } from './fish-state';
 import { SpatialGrid } from './spatial-grid';
 import { computeAvoidanceForce } from './cursor-avoidance';
@@ -22,13 +23,13 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
   grid.rebuild(fish);
   // 先計算全部力再更新，避免陣列順序影響鄰居狀態。
   const forces = fish.map((item) => {
-    if (item.mode === 'grabbed') return new Vector3();
+    if (item.mode === 'grabbed' || isTransitioning(item)) return new Vector3();
     const separation = new Vector3();
     const alignment = new Vector3();
     const center = new Vector3();
     let count = 0;
     const neighbors = grid.queryNeighbors(item.position, params.perceptionRadius)
-      .filter((neighbor) => neighbor !== item)
+      .filter((neighbor) => neighbor !== item && !isTransitioning(neighbor))
       .sort((a, b) => item.position.distanceToSquared(a.position) - item.position.distanceToSquared(b.position) || a.id - b.id);
     for (const neighbor of neighbors) {
       const delta = item.position.clone().sub(neighbor.position);
@@ -69,7 +70,7 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
   });
 
   fish.forEach((item, index) => {
-    if (item.mode === 'grabbed') return;
+    if (item.mode === 'grabbed' || isTransitioning(item)) return;
     let maxSpeed = params.maxSpeed as number;
     if (item.mode === 'fleeing') {
       item.fleeTime = Math.min(GRAB_PARAMS.fleeDuration, item.fleeTime + dt);

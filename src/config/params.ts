@@ -180,6 +180,30 @@ export const CUSTOM_FISH_PARAMS = {
   brushSizes: { small: 6, medium: 14, large: 28 },
   maxUndoActions: 50,
   interpolationRadiusRatio: 0.5, // Maximum point spacing = half the brush diameter.
+  // 新魚從畫面上方掉進水裡（世界單位、秒、弧度）。
+  dropDuration: 1.6,
+  dropTargetRatio: 1 / 3, // 落到魚缸高度從上往下的這個比例處。
+  dropSpreadX: 0.6, // 起點 x 在魚缸寬度中央的這個比例內。
+  dropFrontInset: 0.5, // 起點 z 離 maxZ 至少這麼遠。
+  dropStartMargin: 1, // 起點高於畫面上緣的距離。
+  dropPitch: Math.PI / 3, // 掉落開始時頭朝下的角度。
+  splashDepth: 0.3, // 水花在畫面上緣往下這麼深的地方。
+  // 滿了時最舊的魚游出畫面。
+  leaveSpeedMultiplier: 1.5,
+  leaveMargin: 1.5, // 超出畫面側緣這麼遠才移除。
+  leaveTimeout: 8,
+} as const;
+
+/** 新魚入水時的氣泡水花（世界單位、秒）。 */
+export const SPLASH_PARAMS = {
+  poolSize: 48,
+  perBurst: 14,
+  life: 1.2,
+  radius: 0.06,
+  spread: 1.6, // 初始水平速度上限。
+  rise: 0.9, // 初始向上速度。
+  drag: 3, // 水平速度每秒衰減率。
+  opacity: 0.75,
 } as const;
 
 /** 手機畫魚的轉交後端與輪詢（Worker 也會 import，所以這個檔案不能有任何 import）。 */

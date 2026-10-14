@@ -24,5 +24,6 @@ export function removeCustomFish(fish: Fish[], customId: string): void {
   for(let i=fish.length-1;i>=0;i--) if(fish[i].customId===customId) fish.splice(i,1);
 }
 export function canAddCustomFish(fish: readonly Fish[]): boolean {
-  return fish.filter(item => item.customId !== undefined).length < p.maxCount;
+  // Fish already swimming away no longer occupy a slot.
+  return fish.filter(item => item.customId !== undefined && item.mode !== 'leaving').length < p.maxCount;
 }

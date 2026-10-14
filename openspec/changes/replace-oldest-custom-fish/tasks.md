@@ -5,13 +5,13 @@
 
 ## 1. 掉落、游走與換魚（純邏輯）
 
-- [ ] 1.1 在 `Fish` 加入 `dropping` 和 `leaving` 兩種狀態，以及 `transition` 欄位；`stepSchool` 略過這兩種狀態，鄰居計算也排除牠們（D1）。在 `src/core/tank-bounds.ts` 加入 `visibleTopY`、`visibleHalfWidth`。驗證方式：
+- [x] 1.1 在 `Fish` 加入 `dropping` 和 `leaving` 兩種狀態，以及 `transition` 欄位；`stepSchool` 略過這兩種狀態，鄰居計算也排除牠們（D1）。在 `src/core/tank-bounds.ts` 加入 `visibleTopY`、`visibleHalfWidth`。驗證方式：
   - 單元測試確認 `dropping` 和 `leaving` 的魚在 `stepSchool` 後位置不變，而且不影響鄰居的分離力。
   - `GrabController` 不會選中這兩種狀態的魚。
   - 被抓住的魚改成 `leaving` 後，下一幀 `GrabController` 會放開，不會出錯。
   - `visibleTopY` 在 `z = 0` 時等於 `tan(22.5°) × 14`。
   - 既有測試全部通過。
-- [ ] 1.2 實作 `src/simulation/fish-transitions.ts`（D2、D3）：`spawnDroppingFish`、`stepDropping`、`startLeaving`、`stepLeaving`、`stepTransitions`、`chooseFishToRetire`，並修改 `canAddCustomFish`；在 params 加入 D5 列出的參數。驗證方式：單元測試涵蓋：
+- [x] 1.2 實作 `src/simulation/fish-transitions.ts`（D2、D3）：`spawnDroppingFish`、`stepDropping`、`startLeaving`、`stepLeaving`、`stepTransitions`、`chooseFishToRetire`，並修改 `canAddCustomFish`；在 params 加入 D5 列出的參數。驗證方式：單元測試涵蓋：
   - 生成時 y 在 `visibleTop` 之上；x 在中央 60% 內；1.6 秒內抵達 `targetY`，接著轉成 `swimming`，速度為水平方向乘以 `maxSpeed`；掉落過程中 y 單調遞減。
   - `startLeaving` 往最近的一側；`stepLeaving` 在超過 `visibleHalfWidth + leaveMargin` 時回傳完成；超過 `leaveTimeout` 也會完成。
   - `stepTransitions` 只回傳完成游走的 `customId`。
