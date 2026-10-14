@@ -16,6 +16,37 @@ it('creates no DOM without debug, and updates/disposes the enabled overlay', () 
   const overlay = createFpsOverlay('?debug&seed=42', doc as unknown as Document);
   expect(doc.body.append).toHaveBeenCalledWith(element);
   overlay.update(0); overlay.update(500);
-  expect(element.textContent).toBe('FPS: 2.0');
+  expect(element.textContent).toBe('FPS: 2.0｜抓住：0｜逃走：0｜手:無');
   overlay.dispose(); expect(element.remove).toHaveBeenCalledOnce();
+});
+
+it('shows detection fields only in camera debug mode', () => {
+  for (const search of ['?debug', '?debug&camera']) {
+    const element = { textContent: '', style: {}, remove: vi.fn() };
+    const doc = { createElement: () => element, body: { append() {} } };
+    const overlay = createFpsOverlay(search, doc as unknown as Document);
+    overlay.setDetection({ hz: 25, averageMs: 8, delegate: 'CPU', detected: true });
+    if (search.includes('camera')) {
+      expect(element.textContent).toContain('25.0 Hz');
+      expect(element.textContent).toContain('8.0 ms');
+      expect(element.textContent).toContain('CPU');
+      expect(element.textContent).toContain('偵測: 有');
+    } else expect(element.textContent).toBe('FPS: —｜抓住：0｜逃走：0｜手:無');
+    overlay.dispose();
+  }
+});
+
+it('shows grabbed/fleeing counts and hand press states in debug mode', async () => {
+  const { createSchool } = await import('../../src/simulation/fish-state');
+  const { createRandom } = await import('../../src/core/random');
+  const fish = createSchool(3, { min: {x:-1,y:-1,z:-1}, max: {x:1,y:1,z:1} }, createRandom(42));
+  fish[0].mode='grabbed'; fish[1].mode='fleeing';
+  const element={textContent:'',style:{},remove:vi.fn()};
+  const overlay=createFpsOverlay('?debug',{createElement:()=>element,body:{append(){}}} as unknown as Document);
+  for (const pressed of [false,true]) {
+    overlay.setInteraction(fish,{pointers:[{id:'hand-0',source:'hand',x:.5,y:.5,pressed}]});
+    expect(element.textContent).toContain('抓住：1｜逃走：1');
+    expect(element.textContent).toContain(pressed?'手:捏住':'手:張開');
+  }
+  overlay.setInteraction(fish,{pointers:[]}); expect(element.textContent).toContain('手:無'); overlay.dispose();
 });

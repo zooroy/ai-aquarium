@@ -2,7 +2,7 @@ import { Mesh, PerspectiveCamera, Scene } from 'three';
 import { expect, it, vi } from 'vitest';
 import { updateCursorStates } from '../../src/render/cursor-state';
 import { CursorRenderer } from '../../src/render/cursor-renderer';
-import { CURSOR_PARAMS } from '../../src/config/params';
+import { CURSOR_PARAMS, GRAB_PARAMS } from '../../src/config/params';
 import type { Pointer } from '../../src/input/types';
 const pointer: Pointer = { id: 'mouse', x: 0.25, y: 0.25, pressed: true, source: 'mouse' };
 it('adds/removes by id without mutating snapshots, interpolates and reverses smoothly', () => {
@@ -20,13 +20,13 @@ it('adds/removes by id without mutating snapshots, interpolates and reverses smo
   expect(updateCursorStates(multi, { pointers: [{ ...pointer, id: 'touch-2' }] }, 0)[0].id).toBe('touch-2');
   expect(updateCursorStates(multi, { pointers: [] }, 0)).toEqual([]);
 });
-it('projects to z=2, animates pressed feedback, and disposes disappeared cursors', () => {
+it('projects to the shared hold plane, animates pressed feedback, and disposes disappeared cursors', () => {
   const scene = new Scene(), camera = new PerspectiveCamera(45, 16 / 9, 0.1, 100);
   camera.position.set(0, 0, 14); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
   const renderer = new CursorRenderer(scene, camera);
   renderer.sync({ pointers: [pointer, { ...pointer, id: 'touch-2' }] }, 0.1);
   const mesh = scene.children[0] as Mesh;
-  expect(mesh.position.z).toBeCloseTo(2);
+  expect(mesh.position.z).toBeCloseTo(GRAB_PARAMS.holdZ);
   const projected = mesh.position.clone().project(camera);
   expect((projected.x + 1) / 2).toBeCloseTo(pointer.x);
   expect((1 - projected.y) / 2).toBeCloseTo(pointer.y);
@@ -42,4 +42,14 @@ it('projects to z=2, animates pressed feedback, and disposes disappeared cursors
   renderer.sync({ pointers: [{ ...pointer, id: 'touch-2' }] }, 0);
   expect((scene.children[0].position.clone().project(camera).x + 1) / 2).toBeCloseTo(pointer.x);
   renderer.dispose(); expect(scene.children).toHaveLength(0);
+});
+
+it('never creates a polyhedron for hand pointers and removes an existing same-id mesh', () => {
+  const scene=new Scene(), camera=new PerspectiveCamera(45,1,.1,100);
+  camera.position.z=14; camera.updateMatrixWorld();
+  const renderer=new CursorRenderer(scene,camera);
+  renderer.sync({pointers:[{...pointer,source:'hand'}]},.1); expect(scene.children).toHaveLength(0);
+  renderer.sync({pointers:[pointer]},.1); expect(scene.children).toHaveLength(1);
+  renderer.sync({pointers:[{...pointer,source:'hand'}]},.1); expect(scene.children).toHaveLength(0);
+  renderer.dispose();
 });

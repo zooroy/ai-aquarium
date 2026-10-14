@@ -1,6 +1,6 @@
 import { IcosahedronGeometry, Mesh, MeshLambertMaterial, Vector3 } from 'three';
 import type { PerspectiveCamera, Scene } from 'three';
-import { CURSOR_PARAMS as p } from '../config/params';
+import { CURSOR_PARAMS as p, GRAB_PARAMS } from '../config/params';
 import { PALETTE } from '../config/palette';
 import type { InputState } from '../input/types';
 import { updateCursorStates } from './cursor-state';
@@ -12,7 +12,7 @@ export class CursorRenderer {
   constructor(private readonly scene: Scene, private readonly camera: PerspectiveCamera) {}
 
   sync(state: InputState, dt: number): void {
-    this.states = updateCursorStates(this.states, state, dt);
+    this.states = updateCursorStates(this.states, { pointers: state.pointers.filter((pointer) => pointer.source !== 'hand') }, dt);
     const active = new Set(this.states.map((item) => item.id));
     for (const [id, mesh] of this.meshes) if (!active.has(id)) {
       this.remove(mesh); this.meshes.delete(id);
@@ -30,7 +30,7 @@ export class CursorRenderer {
         this.meshes.set(item.id, mesh); this.scene.add(mesh);
       }
       const ray = new Vector3(item.x * 2 - 1, 1 - item.y * 2, 0).unproject(this.camera).sub(origin);
-      const distance = (p.planeZ - origin.z) / ray.z;
+      const distance = (GRAB_PARAMS.holdZ - origin.z) / ray.z;
       mesh.visible = Number.isFinite(distance) && distance >= 0;
       if (mesh.visible) mesh.position.copy(origin).addScaledVector(ray, distance);
       mesh.scale.setScalar(1 + (p.pressedScale - 1) * item.activation);

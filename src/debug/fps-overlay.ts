@@ -1,3 +1,6 @@
+import type { Fish } from '../simulation/fish-state';
+import type { InputState } from '../input/types';
+import type { DetectionStats } from './camera-debug';
 import { DEBUG_PARAMS } from '../config/params';
 import { PALETTE } from '../config/palette';
 
@@ -17,7 +20,7 @@ export function createFpsCounter() {
 }
 
 export function createFpsOverlay(search: string, doc?: Document) {
-  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, dispose() {} };
+  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, setDetection(_stats: DetectionStats) {}, setInteraction(_fish: readonly Fish[], _state: InputState) {}, dispose() {} };
   const target = doc ?? document;
   const element = target.createElement('div');
   element.textContent = 'FPS: —';
@@ -29,8 +32,22 @@ export function createFpsOverlay(search: string, doc?: Document) {
   });
   target.body.append(element);
   const sample = createFpsCounter();
+  const camera = new URLSearchParams(search).has('camera');
+  let fpsText = 'FPS: —';
+  let interaction = '｜抓住：0｜逃走：0｜手:無';
+  let detection: DetectionStats | undefined;
+  const refresh = () => {
+    element.textContent = fpsText + interaction + (camera ? detection
+      ? ` | detect ${detection.hz.toFixed(1)} Hz | ${detection.averageMs.toFixed(1)} ms | ${detection.delegate} | 偵測: ${detection.detected ? '有' : '無'}`
+      : ' | detect — Hz | — ms | delegate: — | 偵測: —' : '');
+  };
+  refresh();
   return { update(timestamp: number) {
     const fps = sample(timestamp);
-    if (fps !== undefined) element.textContent = `FPS: ${fps.toFixed(1)}`;
+    if (fps !== undefined) { fpsText = `FPS: ${fps.toFixed(1)}`; refresh(); }
+  }, setDetection(stats: DetectionStats) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState) {
+    const hand = state.pointers.find((pointer) => pointer.source === 'hand');
+    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}｜手:${hand ? hand.pressed ? '捏住' : '張開' : '無'}`;
+    if (next !== interaction) { interaction = next; refresh(); }
   }, dispose() { element.remove(); } };
 }

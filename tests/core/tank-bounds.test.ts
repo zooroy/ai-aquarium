@@ -11,7 +11,7 @@ describe('computeTankBounds', () => {
       expect(bounds.min[axis]).toBeLessThan(bounds.max[axis]);
     }
     expect(bounds.min.z).toBe(-8);
-    expect(bounds.max.z).toBe(3);
+    expect(bounds.max.z).toBe(1.5);
     expect(bounds.min.x).toBe(-bounds.max.x);
   });
 

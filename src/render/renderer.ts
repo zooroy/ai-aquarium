@@ -29,6 +29,15 @@ export class AquariumRenderer {
     window.addEventListener('resize', this.resize);
   }
 
+  get aspect(): number { return this.camera.aspect; }
+
+  readonly screenToWorld = (x: number, y: number, z: number): Vector3 => {
+    this.camera.updateMatrixWorld();
+    const origin = this.camera.getWorldPosition(new Vector3());
+    const ray = new Vector3(x * 2 - 1, 1 - y * 2, 0).unproject(this.camera).sub(origin);
+    return origin.addScaledVector(ray, (z - origin.z) / ray.z);
+  };
+
   getBounds(): TankBounds { return this.bounds; }
 
   readonly projectToScreen = (worldPos: Vector3): { x: number; y: number } => {

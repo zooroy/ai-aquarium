@@ -1,3 +1,5 @@
+import { createNoise3D } from 'simplex-noise';
+import { createRandom } from '../../core/random';
 import { Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshLambertMaterial, Quaternion, Vector3 } from 'three';
 import type { Scene } from 'three';
 import { FISH_PARAMS, FISH_RENDER_PARAMS as p } from '../../config/params';
@@ -5,6 +7,8 @@ import { PALETTE } from '../../config/palette';
 import type { Fish } from '../../simulation/fish-state';
 import { createFishGeometry } from './fish-geometry';
 import { applySwimShader } from './swim-shader';
+
+const panicNoise = createNoise3D(createRandom(p.jitterSeed).next);
 
 export class FishRenderer {
   private groups: ReturnType<FishRenderer['createGroups']>;
@@ -65,17 +69,22 @@ export class FishRenderer {
       z.normalize();
       const y = z.clone().cross(x).normalize();
       const rotation = new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(x, y, z));
-      const matrix = new Matrix4().compose(item.position, rotation, new Vector3().setScalar(item.scale));
+      const panic = Math.max(0, Math.min(1, item.panic));
+      const position = item.position.clone();
+      for (const [axis, offset] of [['x', 0], ['y', 1], ['z', 2]] as const) position[axis] += panic * p.jitterAmp * panicNoise(time * p.jitterFreq, item.id, offset);
+      rotation.premultiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), panic * p.wobbleAngle * Math.sin(time * p.wobbleFreq + item.phase)));
+      const matrix = new Matrix4().compose(position, rotation, new Vector3().setScalar(item.scale));
       const index = group.mesh.count++;
       group.mesh.setMatrixAt(index, matrix);
       const ratio = Math.max(0, Math.min(1, (item.velocity.length() - FISH_PARAMS.minSpeed) / (FISH_PARAMS.maxSpeed - FISH_PARAMS.minSpeed)));
       group.mesh.geometry.getAttribute('aSwimPhase').setX(index, item.phase);
-      group.mesh.geometry.getAttribute('aSwimFreq').setX(index, p.minFreq + ratio * (p.maxFreq - p.minFreq));
+      group.mesh.geometry.getAttribute('aSwimFreq').setX(index, (p.minFreq + ratio * (p.maxFreq - p.minFreq)) * (1 + p.panicFreqGain * panic));
+      group.mesh.geometry.getAttribute('aSwimAmp').setX(index, p.defaultAmp * (1 + p.panicAmpGain * panic));
     }
     for (const id of this.yaw.keys()) if (!live.has(id)) this.yaw.delete(id);
     for (const { mesh } of this.groups) {
       mesh.instanceMatrix.needsUpdate = true;
-      for (const name of ['aSwimPhase', 'aSwimFreq']) mesh.geometry.getAttribute(name).needsUpdate = true;
+      for (const name of ['aSwimPhase', 'aSwimFreq', 'aSwimAmp']) mesh.geometry.getAttribute(name).needsUpdate = true;
     }
     this.previousTime = time;
   }

@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { createNoise3D } from 'simplex-noise';
-import { FISH_PARAMS as params } from '../config/params';
+import { FISH_PARAMS as params, GRAB_PARAMS } from '../config/params';
 import { createRandom } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 import type { Pointer } from '../input/types';
@@ -22,6 +22,7 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
   grid.rebuild(fish);
   // 先計算全部力再更新，避免陣列順序影響鄰居狀態。
   const forces = fish.map((item) => {
+    if (item.mode === 'grabbed') return new Vector3();
     const separation = new Vector3();
     const alignment = new Vector3();
     const center = new Vector3();
@@ -36,7 +37,7 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
         if (distance > 0) separation.addScaledVector(delta, (1 - distance / params.separationRadius) / distance);
         else separation.x += item.id < neighbor.id ? -1 : 1;
       }
-      if (count < params.maxNeighbors) {
+      if (neighbor.mode !== 'grabbed' && count < params.maxNeighbors) {
         alignment.add(neighbor.velocity.clone().normalize());
         center.add(neighbor.position);
         count++;
@@ -68,9 +69,18 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
   });
 
   fish.forEach((item, index) => {
+    if (item.mode === 'grabbed') return;
+    let maxSpeed = params.maxSpeed as number;
+    if (item.mode === 'fleeing') {
+      item.fleeTime = Math.min(GRAB_PARAMS.fleeDuration, item.fleeTime + dt);
+      const remaining = 1 - item.fleeTime / GRAB_PARAMS.fleeDuration;
+      maxSpeed *= 1 + (GRAB_PARAMS.fleeSpeedMultiplier - 1) * remaining;
+      item.panic = remaining;
+      if (remaining <= 1e-12) { item.mode = 'swimming'; item.panic = 0; }
+    }
     item.velocity.addScaledVector(forces[index], dt);
     if (item.velocity.lengthSq() === 0) item.velocity.copy(item.forward).multiplyScalar(params.minSpeed);
-    item.velocity.clampLength(params.minSpeed, params.maxSpeed);
+    item.velocity.clampLength(params.minSpeed, maxSpeed);
     const speed = item.velocity.length();
     const horizontal = Math.hypot(item.velocity.x, item.velocity.z);
     const yaw = horizontal > 1e-12 ? Math.atan2(item.velocity.z, item.velocity.x) : Math.atan2(item.forward.z, item.forward.x);

@@ -28,7 +28,6 @@ export const FISH_PARAMS = {
 export const CURSOR_PARAMS = {
   avoidanceRadius: 0.12,
   radius: 0.25,
-  planeZ: 2,
   opacity: 0.55,
   pressedScale: 1.4,
   transitionDuration: 0.1, // 秒。
@@ -48,7 +47,7 @@ export const TANK_PARAMS = {
   cameraFov: 45,
   cameraPosition: { x: 0, y: 0, z: 14 },
   minZ: -8,
-  maxZ: 3,
+  maxZ: 1.5,
   visibleAreaRatio: 0.9,
   // 留白占套用 visibleAreaRatio 後的完整可視高度比例。
   topMarginRatio: 0.05, // 頂部水面。
@@ -113,5 +112,38 @@ export const FISH_RENDER_PARAMS = {
   pectoralFin: [[0.16, -0.02, 0.055], [-0.05, -0.13, 0.2], [-0.1, -0.06, 0.06]],
   baseAmp: 0.075, waveK: 8, minFreq: 3, maxFreq: 7,
   defaultPhase: 0, defaultAmp: 1,
+  jitterAmp: 0.06, jitterFreq: 22, jitterSeed: 71,
+  wobbleAngle: 0.3, wobbleFreq: 24, panicFreqGain: 3, panicAmpGain: 2,
   poleThreshold: 0.05, yawRate: 6,
+} as const;
+
+export const HAND_TRACKER_PARAMS = {
+  wasmPath: '/mediapipe/wasm',
+  modelPath: '/mediapipe/hand_landmarker.task',
+  numHands: 1, width: 640, height: 480, maxHz: 30,
+  intervalTolerance: 0.75, // 容忍約 30fps 來源的影格時間抖動。
+  statsWindowMs: 1000,
+} as const;
+
+export const HAND_PARAMS = {
+  pinchEnter: 0.25, pinchExit: 0.40,
+  // 30Hz、±0.003 均勻雜訊：標準差約 23%；0.1→0.9/300ms 停住133ms誤差約0.00091。
+  minCutoff: 0.5, beta: 5, dCutoff: 1,
+  worldScale: 14, // 約0.18m手長映射到2.5 world單位，約視窗高度25%。
+  activeArea: 0.7, graceMs: 300, fadeSeconds: 0.3,
+  replayJitter: 0.003, replaySeed: 42, replayHz: 30,
+} as const;
+
+export const GRAB_PARAMS = {
+  grabRadius: 0.08, // 畫面寬度比例；距離 hypot(dx, dy / aspect)。
+  holdZ: 2.5, followTimeXY: 0.1, followTimeZ: 0.2,
+  fleeSpeedMultiplier: 2, fleeDuration: 2,
+  panicRise: 0.1, // 秒，線性到達 1。
+} as const;
+
+export const HAND_RENDER_PARAMS = {
+  jointScale: 1.12, tipScale: 1.04, wristScale: 1.2,
+  boneRadiusRatio: 0.32, thumbRadiusRatio: 0.35, palmThickness: 0.22, renderOrder: 10,
+  glowIntensity: 0.8, bubbleCount: 8, bubbleLife: 0.8,
+  bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;

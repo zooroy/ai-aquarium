@@ -5,6 +5,9 @@ import type { Random } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 
 export interface Fish {
+  mode: 'swimming' | 'grabbed' | 'fleeing';
+  panic: number;
+  fleeTime: number;
   id: number;
   position: Vector3;
   velocity: Vector3;
@@ -28,6 +31,7 @@ export function createSchool(count: number, bounds: TankBounds, random: Random):
     const radius = Math.sqrt(1 - z * z);
     const forward = new Vector3(radius * Math.cos(angle), radius * Math.sin(angle), z);
     return {
+      mode: 'swimming', panic: 0, fleeTime: 0,
       id, position, forward,
       velocity: forward.clone().multiplyScalar(random.range(FISH_PARAMS.minSpeed, FISH_PARAMS.maxSpeed)),
       variant: id % PALETTE.fish.length,

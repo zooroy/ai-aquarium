@@ -51,3 +51,21 @@ it('stays finite and continuous across nearly vertical headings', () => {
   }
   renderer.dispose();
 });
+
+it('updates panic frequency/amplitude every frame without mutating fish positions', () => {
+  const scene = new Scene(), renderer = new FishRenderer(scene);
+  const fish = school(1), original = fish[0].position.clone();
+  renderer.sync(fish, 1);
+  const mesh = scene.children[0] as InstancedMesh;
+  const frequency = mesh.geometry.getAttribute('aSwimFreq').getX(0);
+  fish[0].panic = 1; renderer.sync(fish, 2);
+  expect(mesh.geometry.getAttribute('aSwimFreq').getX(0)).toBeCloseTo(frequency * 4);
+  expect(mesh.geometry.getAttribute('aSwimAmp').getX(0)).toBeCloseTo(FISH_RENDER_PARAMS.defaultAmp * 3);
+  expect(fish[0].position).toEqual(original);
+  fish[0].panic = 0; renderer.sync(fish, 3);
+  expect(mesh.geometry.getAttribute('aSwimFreq').getX(0)).toBeCloseTo(frequency);
+  expect(mesh.geometry.getAttribute('aSwimAmp').getX(0)).toBe(FISH_RENDER_PARAMS.defaultAmp);
+  const matrix = new Matrix4(); mesh.getMatrixAt(0,matrix);
+  expect(new Vector3().setFromMatrixPosition(matrix).distanceTo(original)).toBeLessThan(1e-6);
+  renderer.dispose();
+});
