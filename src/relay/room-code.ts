@@ -41,6 +41,6 @@ export function loadRoomCode(storage: CodeStorage | undefined, randomBytes: (len
 }
 
 /** The URL encoded in the tank's QR code; `mode=draw` makes tablets open the drawing page too. */
-export function phonePairUrl(origin: string, room: string): string {
-  return `${origin}/?mode=draw&room=${encodeURIComponent(room)}`;
+export function phonePairUrl(siteUrl: string, room: string): string {
+  return `${siteUrl.replace(/\/?$/, '/')}?mode=draw&room=${encodeURIComponent(room)}`;
 }

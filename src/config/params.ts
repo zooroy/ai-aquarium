@@ -118,8 +118,8 @@ export const FISH_RENDER_PARAMS = {
 } as const;
 
 export const HAND_TRACKER_PARAMS = {
-  wasmPath: '/mediapipe/wasm',
-  modelPath: '/mediapipe/hand_landmarker.task',
+  wasmPath: 'mediapipe/wasm', // 相對於 Vite base，用 assetUrl() 解析。
+  modelPath: 'mediapipe/hand_landmarker.task',
   numHands: 1, width: 640, height: 480, maxHz: 30,
   intervalTolerance: 0.75, // 容忍約 30fps 來源的影格時間抖動。
   statsWindowMs: 1000,

@@ -1,7 +1,7 @@
 import { PALETTE } from '../config/palette';
 import { DRAWING_UI_PARAMS as ui } from '../config/params';
 import { hexColor } from '../drawing/canvas-mapping';
-import { createRelayClient } from '../relay/relay-client';
+import { createRelayClientFromEnv } from '../relay/relay-client';
 import type { RelayClient, UploadResult } from '../relay/relay-client';
 import { isRoomCode } from '../relay/room-code';
 import { createButton } from '../ui/cozy';
@@ -9,6 +9,7 @@ import { createDrawingEditor } from '../ui/drawing-editor';
 
 export const PHONE_MESSAGES = {
   noRoom: '請用桌電魚缸上「用手機畫」的 QR code 打開這一頁。',
+  unavailable: '目前無法送出：傳送魚的服務還沒設定好。',
   hint: '在魚的輪廓裡塗上顏色，畫好後送進魚缸。',
   sending: '傳送中…',
   sentTitle: '送出了！',
@@ -32,7 +33,7 @@ function text(tag: 'h1' | 'p', content: string, style: Partial<CSSStyleDeclarati
 }
 
 /** Full-screen drawing page for phones: draw, then upload to the paired tank's room. */
-export function startPhonePage(search: string, client: Pick<RelayClient, 'upload'> = createRelayClient()) {
+export function startPhonePage(search: string, client: Pick<RelayClient, 'upload'> | undefined = createRelayClientFromEnv()) {
   const root = document.createElement('main');
   Object.assign(root.style, {
     position: 'fixed', inset: '0', overflowX: 'hidden', overflowY: 'auto', boxSizing: 'border-box',
@@ -48,11 +49,13 @@ export function startPhonePage(search: string, client: Pick<RelayClient, 'upload
   document.body.append(root);
   const title = text('h1', '畫一隻魚', { margin: '0 0 8px', fontSize: '22px' });
 
-  const room = new URLSearchParams(search).get('room');
-  if (!isRoomCode(room)) {
-    card.append(title, text('p', PHONE_MESSAGES.noRoom, { margin: '0' }));
+  const roomParam = new URLSearchParams(search).get('room');
+  if (!isRoomCode(roomParam) || !client) {
+    card.append(title, text('p', client ? PHONE_MESSAGES.noRoom : PHONE_MESSAGES.unavailable, { margin: '0' }));
     return { dispose: () => root.remove() };
   }
+  const room: string = roomParam;
+  const relay = client;
 
   const editor = createDrawingEditor();
   const status = text('p', '', { margin: '12px 0 0', minHeight: '1.5em', fontSize: '15px' });
@@ -81,7 +84,7 @@ export function startPhonePage(search: string, client: Pick<RelayClient, 'upload
     if (sending) return;
     sending = true; submit.disabled = true; submit.textContent = PHONE_MESSAGES.sending; status.textContent = '';
     try {
-      const result = await client.upload(room as string, await editor.exportPng());
+      const result = await relay.upload(room, await editor.exportPng());
       if (result.ok) {
         drawingView.hidden = true; sentView.hidden = false;
         submit.textContent = '送進魚缸';

@@ -17,5 +17,6 @@ it('shows the waiting notice only when waiting starts', () => {
 });
 
 it('builds the QR URL for the drawing page', () => {
-  expect(phonePairUrl('https://a.workers.dev', 'AAAAAAAAAAAAAAAAAAAAAA')).toBe('https://a.workers.dev/?mode=draw&room=AAAAAAAAAAAAAAAAAAAAAA');
+  expect(phonePairUrl('https://zooroy.github.io/ai-aquarium/', 'AAAAAAAAAAAAAAAAAAAAAA')).toBe('https://zooroy.github.io/ai-aquarium/?mode=draw&room=AAAAAAAAAAAAAAAAAAAAAA');
+  expect(phonePairUrl('http://localhost:5180', 'AAAAAAAAAAAAAAAAAAAAAA')).toBe('http://localhost:5180/?mode=draw&room=AAAAAAAAAAAAAAAAAAAAAA');
 });

@@ -21,6 +21,8 @@ export function createFishMenu(callbacks: FishMenuCallbacks) {
   setCount(0);
   return {
     show(): void { bar.style.display = 'flex'; },
+    /** Hidden when the phone relay is not configured. */
+    setPairAvailable(available: boolean): void { pair.style.display = available ? '' : 'none'; },
     setCount,
     dispose(): void { bar.remove(); },
   };

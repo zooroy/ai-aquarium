@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { GRAB_PARAMS, HAND_RENDER_PARAMS as p } from '../../config/params';
 import { PALETTE } from '../../config/palette';
 import { createRandom } from '../../core/random';
+import { assetUrl } from '../../core/asset-url';
 import type { HandPose } from '../../input/hand/types';
 import { advanceHandBubbles, bubbleOpacity, transformHandJoints, tiltHandJoints } from './hand-transforms';
 import type { HandBubble } from './hand-transforms';
@@ -35,7 +36,7 @@ export class HandAvatar {
       const dot=new Mesh(new IcosahedronGeometry(p.rigDotRadius,0),new MeshLambertMaterial({color:i<21?PALETTE.hand.rigBones:PALETTE.hand.rigCurrent,depthTest:false}));
       dot.renderOrder=p.renderOrder+1;this.dots.push(dot);this.root.add(dot);
     }
-    const load=options.load??(async()=> (await new GLTFLoader().loadAsync('/models/vr-hand-right.glb')).scene);
+    const load=options.load??(async()=> (await new GLTFLoader().loadAsync(assetUrl('models/vr-hand-right.glb'))).scene);
     this.ready=Promise.resolve().then(load).then(model=>{
       if(this.disposed) {this.disposeModel(model);return;}
       try {

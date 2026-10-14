@@ -1,6 +1,7 @@
 import type { HandLandmarker } from '@mediapipe/tasks-vision';
 import { HAND_TRACKER_PARAMS as p } from '../../config/params';
 import type { HandFrame, Landmark, HandClassification } from './types';
+import { assetUrl } from '../../core/asset-url';
 
 export function toHandFrame(result: { landmarks: readonly (readonly Landmark[])[]; worldLandmarks: readonly (readonly Landmark[])[]; handedness?: readonly (readonly HandClassification[])[] }, timestamp: number): HandFrame | null {
   const landmarks = result.landmarks[0], worldLandmarks = result.worldLandmarks[0];
@@ -20,9 +21,9 @@ export class HandTracker {
   static async create(): Promise<HandTracker> {
     // 延遲載入；一般滑鼠模式與純資料轉換測試不載入 MediaPipe runtime。
     const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
-    const files = await FilesetResolver.forVisionTasks(p.wasmPath);
+    const files = await FilesetResolver.forVisionTasks(assetUrl(p.wasmPath));
     const create = (delegate: 'GPU' | 'CPU') => HandLandmarker.createFromOptions(files, {
-      baseOptions: { modelAssetPath: p.modelPath, delegate }, runningMode: 'VIDEO', numHands: p.numHands,
+      baseOptions: { modelAssetPath: assetUrl(p.modelPath), delegate }, runningMode: 'VIDEO', numHands: p.numHands,
     });
     try { return new HandTracker(await create('GPU'), 'GPU'); }
     catch { return new HandTracker(await create('CPU'), 'CPU'); }

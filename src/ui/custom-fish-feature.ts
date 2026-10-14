@@ -6,7 +6,7 @@ import { canAddCustomFish, removeCustomFish, spawnCustomFish } from '../simulati
 import type { Fish } from '../simulation/fish-state';
 import { createFishInbox } from '../relay/fish-inbox';
 import type { ReceiveResult } from '../relay/fish-inbox';
-import { createRelayClient } from '../relay/relay-client';
+import { createRelayClientFromEnv } from '../relay/relay-client';
 import type { RelayClient } from '../relay/relay-client';
 import { loadRoomCode, phonePairUrl } from '../relay/room-code';
 import { createStore } from '../storage/custom-fish-store';
@@ -48,8 +48,8 @@ export interface CustomFishFeatureContext {
   setGrabEnabled(enabled: boolean): void;
   /** Injectable for tests or fallbacks; defaults to IndexedDB with memory fallback. */
   openStore?: () => Promise<{ store: CustomFishStore; persistent: boolean }>;
-  /** Injectable relay; defaults to the same-origin /api client and this device's saved room code. */
-  relay?: { client: Pick<RelayClient, 'list' | 'download' | 'remove'>; room: string };
+  /** Injectable relay; defaults to the Supabase client from env and this device's saved room code. null disables phone drawing. */
+  relay?: { client: Pick<RelayClient, 'list' | 'download' | 'remove'>; room: string } | null;
 }
 
 interface Loaded { id: string; image: HTMLImageElement; url: string }
@@ -82,18 +82,19 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
       drawing.open();
     },
     list: () => myFish.open([...loaded.values()].map(({ id, image }) => ({ id, image }))),
-    pair: () => pairPanel.open(),
+    pair: () => pairPanel?.open(),
   });
   const drawing = createDrawingPanel({ openChanged: panelChanged, submit: (png) => { void add(png); } });
   const myFish = createMyFishPanel({ openChanged: panelChanged, remove: (id) => remove(id) });
-  const relay = ctx.relay ?? { client: createRelayClient(), room: loadRoomCode(safeLocalStorage()) };
-  const pairPanel = createPhonePairPanel(phonePairUrl(location.origin, relay.room), { openChanged: panelChanged });
+  const relay = ctx.relay === undefined ? defaultRelay() : ctx.relay;
+  menu.setPairAvailable(relay !== null);
+  const pairPanel = relay && createPhonePairPanel(phonePairUrl(location.origin + import.meta.env.BASE_URL, relay.room), { openChanged: panelChanged });
   const showWaiting = createRisingEdge(() => notice.showNotice(CUSTOM_FISH_MESSAGES.waiting));
-  const inbox = createFishInbox({
+  const inbox = relay && createFishInbox({
     client: relay.client, room: relay.room, receive: (id, png) => receive(id, png),
     isVisible: () => document.visibilityState === 'visible', onWaiting: showWaiting,
   });
-  const onVisibility = () => { if (document.visibilityState === 'visible') inbox.poke(); };
+  const onVisibility = () => { if (document.visibilityState === 'visible') inbox?.poke(); };
   document.addEventListener('visibilitychange', onVisibility);
 
   function nextId(): number {
@@ -173,7 +174,7 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
       console.warn('自訂魚清單讀取失敗', error);
     }
     // Start after local fish load, so the 20-fish limit sees them before any phone fish arrives.
-    if (!disposed) inbox.start();
+    if (!disposed) inbox?.start();
   })();
 
   return {
@@ -182,12 +183,17 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     get count(): number { return customCount(); },
     dispose(): void {
       disposed = true;
-      inbox.stop(); document.removeEventListener('visibilitychange', onVisibility);
-      drawing.dispose(); myFish.dispose(); pairPanel.dispose(); menu.dispose(); notice.dispose();
+      inbox?.stop(); document.removeEventListener('visibilitychange', onVisibility);
+      drawing.dispose(); myFish.dispose(); pairPanel?.dispose(); menu.dispose(); notice.dispose();
       for (const { url } of loaded.values()) URL.revokeObjectURL(url);
       loaded.clear();
     },
   };
+}
+
+function defaultRelay(): { client: RelayClient; room: string } | null {
+  const client = createRelayClientFromEnv();
+  return client ? { client, room: loadRoomCode(safeLocalStorage()) } : null;
 }
 
 function safeLocalStorage(): Storage | undefined {
