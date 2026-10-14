@@ -131,6 +131,11 @@ fleeTime: number;    // 進入 fleeing 後經過的秒數
     +---------------------------- fleeing <---------------------------+
 ```
 
+- 抓取判定（真實鏡頭實測後修正）：原本固定半徑為畫面寬度 8%，實測時捏合還沒碰到魚就把魚吸過來。改為依魚在畫面上的大小判定：
+  - 每隻魚的判定半徑 `hit = projectedHalfLength * GRAB_PARAMS.hitScale + GRAB_PARAMS.hitMargin`。
+  - `projectedHalfLength`：把 `fish.position` 和 `fish.position + (bodyLength * scale / 2, 0, 0)` 都用 `projectToScreen` 投影，取兩點在畫面寬度比例下的距離（同樣用 `hypot(dx, dy / aspect)`）。魚離鏡頭越遠，判定範圍越小。
+  - 預設 `hitScale = 1`、`hitMargin = 0.01`（畫面寬度 1%）。移除 `grabRadius`。
+  - 符合 `distance < hit` 的魚當中，選 `distance` 最小的一隻。
 - `src/simulation/grab.ts` 的 `GrabController.update(state, fish, dt, ctx)`：
   - `ctx` 包含 `projectToScreen`，以及 `screenToWorld(x, y, z)`。`screenToWorld` 由 renderer 提供，把螢幕座標反投影到指定 z 平面。
   - 自己記錄每個游標上一幀是否按下，用來判斷「剛按下」，並記錄是哪個游標抓住了魚。
@@ -189,6 +194,12 @@ fleeTime: number;    // 進入 fleeing 後經過的秒數
   - 關節半徑略大於骨頭半徑。
   - 手掌厚度加大。
   - 整體看起來要像粗胖的木頭或黏土玩具手。
+- 外觀（真實鏡頭實測後修正）：使用者回饋「面太多、太複雜」。簡化為：
+  - **移除 21 顆關節球**，不再使用關節的 `InstancedMesh`。
+  - 只保留手指的 15 段骨頭（大拇指 1-2、2-3、3-4；其他四指各 3 段），移除手掌內部的骨頭（0-1、0-5、0-17、5-9、9-13、13-17），由手掌覆蓋。
+  - 骨頭用 **5 邊形**、上下端不分段的 `CylinderGeometry`，稍微收窄（指尖端半徑約為根部的 85%）；兩端各延伸約一個半徑，讓相鄰指節互相重疊，關節處不會出現縫隙。
+  - 手掌維持關節 0、1、5、9、13、17 擠出的單一扁平塊，不加額外細節。
+  - 捏合發光改為作用在大拇指和食指的最末段骨頭（3-4、7-8）。
 - `CursorRenderer` 跳過 `source === 'hand'` 的游標。
 
 ### D8. 不需要真實鏡頭的驗收方法：手勢重播

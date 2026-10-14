@@ -1,4 +1,4 @@
-import { BufferGeometry, Color, CylinderGeometry, DoubleSide, Float32BufferAttribute, Group, IcosahedronGeometry, InstancedMesh, Matrix4, Mesh, MeshLambertMaterial, Quaternion, Vector3 } from 'three';
+import { BufferGeometry, Color, CylinderGeometry, DoubleSide, Float32BufferAttribute, Group, IcosahedronGeometry, InstancedMesh, InstancedBufferAttribute, Mesh, MeshLambertMaterial, Vector3 } from 'three';
 import type { PerspectiveCamera, Scene } from 'three';
 import { GRAB_PARAMS, HAND_RENDER_PARAMS as p } from '../../config/params';
 import { PALETTE } from '../../config/palette';
@@ -9,30 +9,40 @@ import type { HandBubble } from './hand-transforms';
 
 const EDGES = Array.from({ length: 5 }, (_, finger) => {
   const base = finger * 4 + 1;
-  return [[0, base], [base, base + 1], [base + 1, base + 2], [base + 2, base + 3]];
+  return [[base, base + 1], [base + 1, base + 2], [base + 2, base + 3]];
 }).flat();
 const PALM = [0, 1, 5, 9, 13, 17];
 const material = (color: number) => new MeshLambertMaterial({ color, flatShading: true, transparent: true, depthWrite: false });
 
 export class HandAvatar {
   private readonly root = new Group();
-  private readonly joints = new InstancedMesh(new IcosahedronGeometry(1, 0), material(PALETTE.hand.joint), 21);
-  private readonly bones = new InstancedMesh(new CylinderGeometry(1, 1, 1, 6), material(PALETTE.hand.base), 20);
+  private readonly bones = new InstancedMesh(new CylinderGeometry(1, 1, 1, p.radialSegments, p.heightSegments), material(0xffffff), 15);
   private readonly palm = new Mesh(new BufferGeometry(), material(PALETTE.hand.base));
-  private readonly tips = new InstancedMesh(new IcosahedronGeometry(1, 0), material(PALETTE.hand.glow), 2);
   private readonly bubbles: Mesh<IcosahedronGeometry, MeshLambertMaterial>[] = [];
   private particles: HandBubble[] = [];
   private readonly random = createRandom(p.bubbleSeed);
   private pressed = false;
   constructor(private readonly scene: Scene, _camera: PerspectiveCamera) {
     this.root.name = 'hand-avatar'; this.root.visible = false;
-    this.joints.material.color.set(0xffffff);
+    this.bones.name = 'hand-fingers';
+    // 共用等粗圓柱；只在每根手指的末段套用指尖收窄。
+    this.bones.geometry.setAttribute('aTipRatio', new InstancedBufferAttribute(
+      new Float32Array(EDGES.map(([, b]) => b % 4 === 0 ? p.tipRadiusRatio : 1)), 1));
+    this.bones.geometry.setAttribute('aPinchGlow', new InstancedBufferAttribute(new Float32Array(15), 1));
+    this.bones.material.emissive.set(PALETTE.hand.glow);
+    this.bones.material.emissiveIntensity = p.glowIntensity;
+    this.bones.material.onBeforeCompile = (shader) => {
+      shader.vertexShader = 'attribute float aTipRatio; attribute float aPinchGlow; varying float vPinchGlow;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xz *= mix(1.0, aTipRatio, position.y + 0.5);\nvPinchGlow = aPinchGlow;');
+      shader.fragmentShader = 'varying float vPinchGlow;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vPinchGlow;');
+    };
+    this.bones.material.customProgramCacheKey = () => 'hand-finger-tip-glow-v2';
     this.palm.material.side = DoubleSide;
     this.palm.geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(20 * 9), 3));
-    for (const object of [this.joints, this.bones, this.palm, this.tips]) {
+    for (const object of [this.bones, this.palm]) {
       object.renderOrder = p.renderOrder; object.frustumCulled = false; this.root.add(object);
     }
-    this.tips.material.emissive.set(PALETTE.hand.glow); this.tips.material.emissiveIntensity = p.glowIntensity;
     for (let i = 0; i < p.bubbleCount; i++) {
       const mesh = new Mesh(new IcosahedronGeometry(p.bubbleRadius, 0), material(PALETTE.bubbles));
       mesh.renderOrder = p.renderOrder; mesh.visible = false; this.bubbles.push(mesh); this.root.add(mesh);
@@ -52,19 +62,15 @@ export class HandAvatar {
     }));
     this.pressed = pressed;
     const radii = handRadii(joints, EDGES);
-    for (let i = 0; i < 21; i++) {
-      const scale = radii.joints[i];
-      const matrix = new Matrix4().compose(joints[i], new Quaternion(), new Vector3().setScalar(scale));
-      this.joints.setMatrixAt(i, matrix);
-      this.joints.setColorAt(i, new Color(pressed && (i === 4 || i === 8) ? PALETTE.hand.glow : PALETTE.hand.joint));
-    }
-    this.joints.instanceMatrix.needsUpdate = true;
-    if (this.joints.instanceColor) this.joints.instanceColor.needsUpdate = true;
-    EDGES.forEach(([a, b], i) => this.bones.setMatrixAt(i, boneTransform(joints[a], joints[b], radii.bones[i])));
+    EDGES.forEach(([a, b], i) => {
+      this.bones.setMatrixAt(i, boneTransform(joints[a], joints[b], radii[i], radii[i] * p.endExtension));
+      const glow = pressed && (b === 4 || b === 8);
+      this.bones.setColorAt(i, new Color(glow ? PALETTE.hand.glow : PALETTE.hand.base));
+      this.bones.geometry.getAttribute('aPinchGlow').setX(i, glow ? 1 : 0);
+    });
     this.bones.instanceMatrix.needsUpdate = true;
-    this.tips.visible = pressed;
-    [4, 8].forEach((id, i) => this.tips.setMatrixAt(i, new Matrix4().compose(joints[id], new Quaternion(), new Vector3().setScalar(radii.joints[id]))));
-    this.tips.instanceMatrix.needsUpdate = true;
+    this.bones.geometry.getAttribute('aPinchGlow').needsUpdate = true;
+    if (this.bones.instanceColor) this.bones.instanceColor.needsUpdate = true;
     const positions: number[] = [];
     const front = PALM.map((id) => joints[id].clone().add(new Vector3(0, 0, p.palmThickness / 2)));
     const back = PALM.map((id) => joints[id].clone().add(new Vector3(0, 0, -p.palmThickness / 2)));
@@ -75,7 +81,7 @@ export class HandAvatar {
     // 6邊形擠出：8個端面三角形 + 12個側面三角形。
     (attribute.array as Float32Array).set(positions); attribute.needsUpdate = true;
     this.palm.geometry.setDrawRange(0, positions.length / 3); this.palm.geometry.computeVertexNormals();
-    for (const mesh of [this.joints,this.bones,this.palm,this.tips]) mesh.material.opacity = pose.opacity;
+    for (const mesh of [this.bones,this.palm]) mesh.material.opacity = pose.opacity;
     this.bubbles.forEach((mesh,i) => {
       const bubble = this.particles[i]; mesh.visible = !!bubble;
       if (bubble) { mesh.position.copy(bubble.position); mesh.material.opacity = pose.opacity * bubbleOpacity(bubble.age); }
@@ -83,7 +89,7 @@ export class HandAvatar {
   }
   dispose(): void {
     this.scene.remove(this.root);
-    for (const mesh of [this.joints,this.bones,this.palm,this.tips,...this.bubbles]) {
+    for (const mesh of [this.bones,this.palm,...this.bubbles]) {
       if (mesh instanceof InstancedMesh) mesh.dispose();
       mesh.geometry.dispose(); mesh.material.dispose();
     }

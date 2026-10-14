@@ -135,15 +135,15 @@ export const HAND_PARAMS = {
 } as const;
 
 export const GRAB_PARAMS = {
-  grabRadius: 0.08, // 畫面寬度比例；距離 hypot(dx, dy / aspect)。
+  hitScale: 1, hitMargin: 0.01, // 投影半身長倍率與畫面寬度比例邊距。
   holdZ: 2.5, followTimeXY: 0.1, followTimeZ: 0.2,
   fleeSpeedMultiplier: 2, fleeDuration: 2,
   panicRise: 0.1, // 秒，線性到達 1。
 } as const;
 
 export const HAND_RENDER_PARAMS = {
-  jointScale: 1.12, tipScale: 1.04, wristScale: 1.2,
-  boneRadiusRatio: 0.32, thumbRadiusRatio: 0.35, palmThickness: 0.22, renderOrder: 10,
+  radialSegments: 5, heightSegments: 1, tipRadiusRatio: 0.85, endExtension: 1,
+  boneRadiusRatio: 0.4, thumbRadiusRatio: 0.42, palmThickness: 0.22, renderOrder: 10,
   glowIntensity: 0.8, bubbleCount: 8, bubbleLife: 0.8,
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;

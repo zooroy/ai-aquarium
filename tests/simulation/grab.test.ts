@@ -9,7 +9,7 @@ import type { Pointer } from '../../src/input/types';
 const bounds = { min: { x: -5, y: -4, z: -8 }, max: { x: 5, y: 4, z: 1.5 } };
 const ctx = { bounds, aspect: 1, projectToScreen: (p: Vector3) => ({ x: .5 + p.x / 10, y: .5 - p.y / 10 }), screenToWorld: (x: number, y: number, z: number) => new Vector3((x - .5) * 10, (.5 - y) * 10, z) };
 const pointer: Pointer = { id: 'mouse', x: .5, y: .5, pressed: true, source: 'mouse' };
-function school(count = 2) { const fish = createSchool(count, bounds, createRandom(42)); fish.forEach((f, i) => f.position.set(.3 + i * .3, 0, 0)); return fish; }
+function school(count = 2) { const fish = createSchool(count, bounds, createRandom(42)); fish.forEach((f, i) => { f.position.set(.3 + i * .3, 0, 0); f.scale = 1; }); return fish; }
 it('initializes normal fish and selects the closest candidate', () => {
   const fish = school(); expect(fish.every((f) => f.mode === 'swimming' && f.panic === 0 && f.fleeTime === 0)).toBe(true);
   new GrabController().update({ pointers: [pointer] }, fish, 0, ctx);
@@ -25,11 +25,11 @@ it('does not grab in empty space or by dragging an already pressed pointer', () 
   expect(fish[0].mode).toBe('grabbed');
 });
 it('uses width-normalized distance and excludes the exact radius boundary', () => {
-  const fish = school(1); fish[0].position.set(0, 0.6, 0);
+  const fish = school(1); fish[0].position.set(0, 0.4, 0);
   new GrabController().update({ pointers: [pointer] }, fish, 0, ctx);
   expect(fish[0].mode).toBe('grabbed');
   fish[0].mode = 'swimming';
-  new GrabController().update({ pointers: [{ ...pointer, x: 0, y: 0 }] }, fish, 0, { ...ctx, projectToScreen: () => ({ x: GRAB_PARAMS.grabRadius, y: 0 }) });
+  new GrabController().update({ pointers: [{ ...pointer, x: 0, y: 0 }] }, fish, 0, { ...ctx, projectToScreen: () => ({ x: GRAB_PARAMS.hitMargin, y: 0 }) });
   expect(fish[0].mode).toBe('swimming');
 });
 it.each(['mouse', 'touch', 'hand'] as const)('supports %s and only one grabbed fish for two pointers', (source) => {
@@ -93,13 +93,13 @@ it('decays fleeing cap/panic and returns to normal within two seconds', () => {
 });
 
 
-it.each([0.07, 0.09])('checks vertical distance %s in width units at 16:9', (distance) => {
-  const fish = school(1), aspect = 16 / 9;
+it.each([0.05, 0.07])('checks vertical distance %s in width units at 16:9', (distance) => {
+  const fish = school(1), aspect = 16 / 9; fish[0].position.set(0,0,0);
   new GrabController().update({ pointers: [pointer] }, fish, 0, {
     ...ctx, aspect,
-    projectToScreen: () => ({ x: pointer.x, y: pointer.y + distance * aspect }),
+    projectToScreen: (p: Vector3) => ({ x: pointer.x + p.x / 10, y: pointer.y + distance * aspect }),
   });
-  expect(fish[0].mode).toBe(distance < GRAB_PARAMS.grabRadius ? 'grabbed' : 'swimming');
+  expect(fish[0].mode).toBe(distance < .05 * GRAB_PARAMS.hitScale + GRAB_PARAMS.hitMargin ? 'grabbed' : 'swimming');
 });
 
 it.each([-1, 1])('caps upward escape pitch while preserving current horizontal heading %s', (heading) => {
@@ -121,4 +121,22 @@ it.each([-1, 1])('preserves existing escape x sign %s when limiting pitch', (sig
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
   grab.update({ pointers: [{ ...pointer, y: .6, pressed: false }] }, fish, 0, ctx);
   expect(Math.sign(fish[0].velocity.x)).toBe(sign);
+});
+
+it('does not attract an adjacent fish outside its projected silhouette and margin', () => {
+  const fish = school(1); fish[0].position.x = .7;
+  new GrabController().update({ pointers: [pointer] }, fish, 0, ctx);
+  expect(fish[0].mode).toBe('swimming');
+});
+it.each([0, -8])('uses a smaller hit range for a distant fish at z=%s', (z) => {
+  const fish = school(1); fish[0].position.set(.04 * (14-z), 0, z);
+  new GrabController().update({ pointers: [pointer] }, fish, 0, {
+    ...ctx, projectToScreen: (p: Vector3) => ({x: .5 + p.x / (14-p.z), y: .5 - p.y / (14-p.z)}),
+  });
+  expect(fish[0].mode).toBe(z === 0 ? 'grabbed' : 'swimming');
+});
+it('selects the nearest center when projected hit regions overlap, regardless of array order', () => {
+  const fish = school(); fish[1].position.x = .2;
+  new GrabController().update({ pointers: [pointer] }, fish, 0, ctx);
+  expect(fish.map(f => f.mode)).toEqual(['swimming', 'grabbed']);
 });

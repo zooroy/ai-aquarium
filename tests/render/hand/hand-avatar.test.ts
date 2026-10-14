@@ -1,10 +1,10 @@
-import { Matrix4, PerspectiveCamera, Quaternion, Scene, Vector3, InstancedMesh } from 'three';
+import { CylinderGeometry, PerspectiveCamera, Quaternion, Scene, Vector3, InstancedMesh } from 'three';
 import { expect, it } from 'vitest';
 import { HandAvatar } from '../../../src/render/hand/hand-avatar';
 import { advanceHandBubbles, boneTransform, bubbleOpacity, transformHandJoints } from '../../../src/render/hand/hand-transforms';
 import { HandProvider } from '../../../src/input/hand/hand-provider';
 import { createReplaySource, getReplayScript } from '../../../src/input/hand/replay-source';
-import { HAND_PARAMS } from '../../../src/config/params';
+import { HAND_PARAMS, HAND_RENDER_PARAMS } from '../../../src/config/params';
 function pose() { const provider = new HandProvider(); provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(0), 0); return provider.getHandPose(300); }
 it('keeps provider mirror/y-up and aligns pinch midpoint without scaling camera distance', () => {
   const state = pose(), target = new Vector3(2,3,2);
@@ -31,27 +31,49 @@ it('advances particles without mutation and expires at 0.8 seconds', () => {
   expect(bubbleOpacity(moved[0].age)).toBe(.5);
   expect(advanceHandBubbles(moved,.4)).toEqual([]);
 });
-it('builds joint/bone instances, fades and removes resources', () => {
+it('builds only 15 tapered finger instances without joint meshes, fades and removes resources', () => {
   const scene=new Scene(), avatar=new HandAvatar(scene,new PerspectiveCamera()); const state=pose();
   avatar.sync(state,0,()=>new Vector3(0,0,2));
   const root=scene.children[0]; expect(root.visible).toBe(true);
-  expect((root.children[0] as InstancedMesh).count).toBe(21);
-  expect((root.children[1] as InstancedMesh).count).toBe(20);
+  const bones = root.children[0] as InstancedMesh<CylinderGeometry>;
+  expect(bones.count).toBe(15);
+  expect(Array.from(bones.geometry.getAttribute('aTipRatio').array)).toEqual(
+    Array.from({length:15}, (_,i) => i % 3 === 2 ? Math.fround(HAND_RENDER_PARAMS.tipRadiusRatio) : 1));
+  expect(root.children.filter(c => c instanceof InstancedMesh)).toEqual([bones]);
+  expect(bones.geometry.parameters).toMatchObject({radialSegments:5, heightSegments:1, radiusTop:1, radiusBottom:1});
+  expect(Array.from(bones.geometry.getAttribute('aPinchGlow').array)).toEqual(Array(15).fill(0));
   avatar.sync({...state,pressed:true},.01,()=>new Vector3(0,0,2));
-  expect(root.children.slice(4).filter((c)=>c.visible)).toHaveLength(8);
+  expect(root.children.slice(2).filter((c)=>c.visible)).toHaveLength(8);
+  expect(Array.from(bones.geometry.getAttribute('aPinchGlow').array)).toEqual(Array.from({length:15}, (_,i)=>i===2||i===5?1:0));
   avatar.sync({...state,pressed:true},.81,()=>new Vector3(0,0,2));
-  expect(root.children.slice(4).every((c)=>!c.visible)).toBe(true);
+  expect(root.children.slice(2).every((c)=>!c.visible)).toBe(true);
   avatar.sync({...state,visible:false,opacity:0},.1,()=>new Vector3()); expect(root.visible).toBe(false);
   avatar.dispose(); expect(scene.children).toHaveLength(0);
 });
 
-it('uses chunky bone radii and larger adjacent joints', async () => {
+it('extends both bone ends by one chunky radius to overlap adjacent segments', async () => {
   const { handRadii } = await import('../../../src/render/hand/hand-transforms');
-  const points = [new Vector3(), new Vector3(0,1,0), new Vector3(0,2,0)];
-  const edges = [[0,1],[1,2]];
-  const radii = handRadii(points,edges);
-  radii.bones.forEach((radius) => { expect(radius).toBeGreaterThanOrEqual(.3); expect(radius).toBeLessThanOrEqual(.35); });
-  edges.forEach(([a,b],i) => { expect(radii.joints[a]).toBeGreaterThan(radii.bones[i]); expect(radii.joints[b]).toBeGreaterThan(radii.bones[i]); });
-  const matrix = boneTransform(points[0],points[1],radii.bones[0]);
-  expect(new Vector3().setFromMatrixScale(matrix).x).toBeCloseTo(.35);
+  const points = [new Vector3(), new Vector3(1,2,3), new Vector3(1,3,3)];
+  const radii = handRadii(points,[[1,2]]);
+  radii.forEach(radius => { expect(radius).toBeCloseTo(.42); });
+  const radius = radii[0], extension = radius * HAND_RENDER_PARAMS.endExtension;
+  const matrix = boneTransform(points[1],points[2],radius,extension);
+  expect(new Vector3(0,-.5,0).applyMatrix4(matrix).distanceTo(points[1].clone().add(new Vector3(0,-radius,0)))).toBeLessThan(1e-12);
+  expect(new Vector3(0,.5,0).applyMatrix4(matrix).distanceTo(points[2].clone().add(new Vector3(0,radius,0)))).toBeLessThan(1e-12);
+});
+
+it('uses the proximal segment length for all three radii of each finger despite unequal lengths', async () => {
+  const { handRadii } = await import('../../../src/render/hand/hand-transforms');
+  const points = Array.from({length:21}, () => new Vector3());
+  const edges: number[][] = [];
+  for (let finger=0; finger<5; finger++) {
+    const base=1+finger*4;
+    [0,2,3,3.5].forEach((y,i)=>points[base+i].set(finger,y,0));
+    edges.push([base,base+1],[base+1,base+2],[base+2,base+3]);
+  }
+  const radii=handRadii(points,edges);
+  for (let finger=0; finger<5; finger++) {
+    const expected=2*(finger===0?HAND_RENDER_PARAMS.thumbRadiusRatio:HAND_RENDER_PARAMS.boneRadiusRatio);
+    expect(radii.slice(finger*3,finger*3+3)).toEqual([expected,expected,expected]);
+  }
 });

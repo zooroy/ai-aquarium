@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { FISH_PARAMS, GRAB_PARAMS as p } from '../config/params';
+import { FISH_PARAMS, FISH_RENDER_PARAMS, GRAB_PARAMS as p } from '../config/params';
 import type { TankBounds } from '../core/tank-bounds';
 import type { InputState } from '../input/types';
 import type { Fish } from './fish-state';
@@ -45,12 +45,15 @@ export class GrabController {
       for (const pointer of state.pointers) {
         if (!pointer.pressed || this.previous.get(pointer.id)) continue;
         let nearest: Fish | undefined;
-        let distance = p.grabRadius as number;
+        let distance = Infinity;
         for (const item of fish) {
           if (item.mode !== 'swimming' && item.mode !== 'fleeing') continue;
           const screen = ctx.projectToScreen(item.position);
           const candidate = Math.hypot(screen.x - pointer.x, (screen.y - pointer.y) / ctx.aspect);
-          if (candidate < distance) { nearest = item; distance = candidate; }
+          const end = ctx.projectToScreen(item.position.clone().add(new Vector3(FISH_RENDER_PARAMS.bodyLength * item.scale / 2, 0, 0)));
+          const projectedHalfLength = Math.hypot(end.x - screen.x, (end.y - screen.y) / ctx.aspect);
+          const hit = projectedHalfLength * p.hitScale + p.hitMargin;
+          if (candidate < hit && candidate < distance) { nearest = item; distance = candidate; }
         }
         if (nearest) {
           nearest.mode = 'grabbed'; nearest.fleeTime = 0;
