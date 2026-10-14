@@ -142,9 +142,12 @@ export const GRAB_PARAMS = {
 } as const;
 
 export const HAND_RENDER_PARAMS = {
-  radialSegments: 5, heightSegments: 1, tipRadiusRatio: 0.85, endExtension: 1,
-  boneRadiusRatio: 0.4, thumbRadiusRatio: 0.42, palmThickness: 0.22, renderOrder: 10,
-  glowIntensity: 0.8, bubbleCount: 8, bubbleLife: 0.8,
+  fingerWidth: 0.9, fingerGapRatio: 0.7, fingerThickness: 0.7, fingerTaper: 0.04,
+  tipScale: 0.55, tipExtension: 0.12, palmExpansion: 0.15, palmBevel: 0.35, renderOrder: 10,
+  displayTiltAcross: 20 * Math.PI / 180, displayTiltUp: -15 * Math.PI / 180,
+  rootInset: 0.5, shortSegmentWidth: 0.75,
+  maxMiterAngle: Math.PI / 2, widthAxisEpsilon: 0.01,
+  bubbleCount: 8, bubbleLife: 0.8,
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;
 

@@ -1,6 +1,6 @@
 /** Cozy 低飽和粉彩；使用 Three.js 可直接接收的 hex 數值。 */
 export const PALETTE = {
-  hand: { base: 0xdcbda9, joint: 0xeac9b7, glow: 0xffe5b5 },
+  hand: { base: 0xf0c4a4, glow: 0xffe5b5 },
   water: 0xb3d4d1,
   fog: 0xb3d4d1, // 霧與背景同色，讓遠景自然融入水中。
   sand: 0xe5d7bb,
