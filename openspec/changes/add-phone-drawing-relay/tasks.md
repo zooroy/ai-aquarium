@@ -17,7 +17,7 @@
 ## 1. 後端轉交（SQL）
 
 - [x] 1.1 **[Claude]** （已被 1.2 取代）Cloudflare Worker 版的轉交 API。
-- [ ] 1.2 撰寫 `supabase/migrations/0001_fish_relay.sql` 與 `0002_fish_relay_cron.sql`（D2）。驗證方式：寫單元測試 `tests/supabase/fish-relay.test.ts`，用 PGlite 執行 0001；測試前先建立 `anon` 角色，並以 `set role anon` 呼叫函式。涵蓋 fish-relay spec 的每個情境：
+- [x] 1.2 撰寫 `supabase/migrations/0001_fish_relay.sql` 與 `0002_fish_relay_cron.sql`（D2）。驗證方式：寫單元測試 `tests/supabase/fish-relay.test.ts`，用 PGlite 執行 0001；測試前先建立 `anon` 角色，並以 `set role anon` 呼叫函式。涵蓋 fish-relay spec 的每個情境：
   - 房間互相隔離。
   - 房間代碼格式錯誤時回報 `invalid-room`。
   - 正確的 PNG 回傳 id，查詢得到。
