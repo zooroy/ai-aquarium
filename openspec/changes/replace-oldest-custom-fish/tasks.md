@@ -20,7 +20,7 @@
 
 ## 2. 入水水花
 
-- [ ] 2.1 實作 `src/render/environment/splash.ts` 和 `SPLASH_PARAMS`（D4）。驗證方式：
+- [x] 2.1 實作 `src/render/environment/splash.ts` 和 `SPLASH_PARAMS`（D4）。驗證方式：
   - 單元測試確認 `advanceSplashBubble` 會往上飄、水平速度遞減、超過 `life` 後就不再顯示。
   - 連續 burst 超過物件池大小時，不建立新的 Mesh。
   - `dispose` 會釋放幾何和材質。
