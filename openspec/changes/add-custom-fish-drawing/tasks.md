@@ -5,13 +5,13 @@
 
 ## 1. 模板、UV 與畫圖模型（純邏輯）
 
-- [ ] 1.1 實作 `src/drawing/fish-template.ts`（D1）：由魚的幾何算出 `FRAME`、`xyToUv()`、`fishSilhouetteTriangles()`；在 `createFishGeometry()` 加上 `uv` 屬性；`CUSTOM_FISH_PARAMS` 加入 FRAME 邊距與貼圖尺寸。驗證方式：
+- [x] 1.1 實作 `src/drawing/fish-template.ts`（D1）：由魚的幾何算出 `FRAME`、`xyToUv()`、`fishSilhouetteTriangles()`；在 `createFishGeometry()` 加上 `uv` 屬性；`CUSTOM_FISH_PARAMS` 加入 FRAME 邊距與貼圖尺寸。驗證方式：
   - 單元測試確認所有頂點的 UV 都在 0..1 內。
   - 頭部（+x）的 u 大於尾部，背鰭頂端的 v 最大。
   - 左右兩側對應頂點的 UV 相同。
   - 輪廓三角形的總面積大於 0，而且都在 0..1 內。
   - 既有的魚幾何測試仍然通過。
-- [ ] 1.2 實作 `src/drawing/drawing-model.ts`（D2）：筆畫的新增、延伸、結束，復原（至少 20 筆，上限 50 筆後合併），清除（可復原），以及遠距點插值；在 params 和 palette 加入筆刷大小、`PALETTE.brush`（10～12 色）、`PALETTE.customFishBase`。驗證方式：單元測試涵蓋 fish-drawing spec 的復原與清除情境、插值後相鄰點的距離不超過筆刷半徑、超過上限時的合併行為。
+- [x] 1.2 實作 `src/drawing/drawing-model.ts`（D2）：筆畫的新增、延伸、結束，復原（至少 20 筆，上限 50 筆後合併），清除（可復原），以及遠距點插值；在 params 和 palette 加入筆刷大小、`PALETTE.brush`（10～12 色）、`PALETTE.customFishBase`。驗證方式：單元測試涵蓋 fish-drawing spec 的復原與清除情境、插值後相鄰點的距離不超過筆刷半徑、超過上限時的合併行為。
 
 ## 2. 儲存與模擬
 

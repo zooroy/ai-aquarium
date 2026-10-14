@@ -156,3 +156,13 @@ export const ONBOARDING_PARAMS = {
   noticePadding: 12,
   noticeRadius: 12,
 } as const;
+
+/** Drawing uses normalized UV coordinates; brush diameters are texture pixels. */
+export const CUSTOM_FISH_PARAMS = {
+  frameMargin: 0.025, // Model units added to every xy bounding-box edge.
+  textureWidth: 512,
+  textureHeight: 256,
+  brushSizes: { small: 6, medium: 14, large: 28 },
+  maxUndoActions: 50,
+  interpolationRadiusRatio: 0.5, // Maximum point spacing = half the brush diameter.
+} as const;
