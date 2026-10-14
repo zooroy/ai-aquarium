@@ -39,7 +39,7 @@
 
 ## 4. 介面與整合
 
-- [ ] 4.1 實作 `src/ui/notice.ts`（共用的右下角提示框），開場畫面改用它（D8）。驗證方式：既有的開場畫面測試全部通過。
+- [x] 4.1 實作 `src/ui/notice.ts`（共用的右下角提示框），開場畫面改用它（D8）。驗證方式：既有的開場畫面測試全部通過。
 - [ ] 4.2 實作 `src/ui/drawing-panel.ts`（D2、D3、D8）：用輪廓三角形畫遮罩與輪廓線；色票、筆刷大小、橡皮擦、復原、清除；Pointer Events 加上 coalesced events；`touch-action: none`；「取消」與「放進魚缸」（輸出 512×256 PNG Blob）；面板事件不傳到魚缸。驗證方式：把 DOM 以外可以測的部分（筆刷像素大小換算、正規化座標換算）寫單元測試；build 成功；外觀由 Claude 截圖驗收。
 - [ ] 4.3 實作 `src/ui/my-fish-panel.ts`（D8）：縮圖清單、目前數量（n/20）、刪除前在面板內確認。驗證方式：build 成功；由 Claude 截圖驗收。
 - [ ] 4.4 在 `app.ts` 整合（D5～D8）：

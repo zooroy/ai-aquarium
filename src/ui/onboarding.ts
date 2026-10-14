@@ -1,3 +1,4 @@
+import { createNotice } from './notice';
 import { PALETTE } from '../config/palette';
 import { ONBOARDING_PARAMS } from '../config/params';
 import { startCameraSession } from './camera-session';
@@ -59,21 +60,12 @@ export function createOnboarding(callbacks: Omit<OnboardingCallbacks, 'changed'>
   const credit = document.createElement('small'); credit.textContent = '3D 手模型「VR Hands: Bouldering (R) Rigged」by Cheezguzzler（Sketchfab，CC BY 4.0）';
   credit.style.display = 'block';
   card.append(text,privacy,camera,mouse,loading,credit); layer.append(card); document.body.append(layer);
-  const notice = document.createElement('div'); notice.setAttribute('role','status'); notice.hidden = true;
-  Object.assign(notice.style, {
-    position: 'fixed', bottom: `${ONBOARDING_PARAMS.noticeInset}px`, right: `${ONBOARDING_PARAMS.noticeInset}px`,
-    width: 'max-content', maxWidth: `calc(100vw - ${ONBOARDING_PARAMS.noticeInset * 2}px)`,
-    boxSizing: 'border-box', overflowWrap: 'anywhere', zIndex: '21',
-    padding: `${ONBOARDING_PARAMS.noticePadding}px`, borderRadius: `${ONBOARDING_PARAMS.noticeRadius}px`,
-    background: `${hex(PALETTE.sand)}ee`, color: hex(PALETTE.debugBackground),
-    boxShadow: card.style.boxShadow, pointerEvents: 'none', fontFamily: 'system-ui',
-  });
-  document.body.append(notice);
+  const notice = createNotice();
   const controller = createOnboardingController({ ...callbacks, changed(state,message) {
     layer.style.display = state === 'choosing' || state === 'loading' ? 'grid' : 'none';
     loading.hidden = state !== 'loading'; camera.disabled = mouse.disabled = state === 'loading';
-    notice.textContent = message; notice.hidden = !message;
+    notice.showNotice(message);
   } });
   camera.addEventListener('click', () => controller.camera()); mouse.addEventListener('click', () => controller.mouse());
-  return { dispose() { controller.dispose(); layer.remove(); notice.remove(); } };
+  return { dispose() { controller.dispose(); layer.remove(); notice.dispose(); } };
 }
