@@ -83,7 +83,7 @@
   - 桌電畫圖面板的行為不變。
 - [ ] 5.2 **[User]** 註冊 Supabase，建立免費專案，提供 Project URL 和 anon key；如果要用 CLI 套用 SQL，執行 `! npx supabase login`。
 - [x] 5.3 **[Claude]** 套用 migration 並啟用 pg_cron，寫入 `.env.local`，然後用真正的 Supabase 重做一次 5.1 的送魚、收魚、已滿、離線檢查。
-- [ ] 5.4 **[Claude]** 建立公開 repo `zooroy/ai-aquarium`，設定 Actions variables，開啟 Pages，push 後確認 Actions 成功。用 `https://zooroy.github.io/ai-aquarium/` 驗收：
+- [x] 5.4 **[Claude]** 建立公開 repo `zooroy/ai-aquarium`，設定 Actions variables，開啟 Pages，push 後確認 Actions 成功。用 `https://zooroy.github.io/ai-aquarium/` 驗收：
   - 魚缸、相機（HTTPS）、手模型都正常。
   - 手機頁正常。
 - [ ] 5.5 **[User]** 用真的 iPhone 掃描 QR code，畫一隻魚送出，桌電收到。
