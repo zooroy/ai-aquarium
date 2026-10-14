@@ -49,8 +49,8 @@
 
 ## 3. 畫圖編輯器與手機頁
 
-- [ ] 3.1 從 `drawing-panel.ts` 抽出 `src/ui/drawing-editor.ts`（D4），`drawing-panel.ts` 改用它，桌電的行為不變。驗證方式：typecheck 和 build 通過；由 Claude 在瀏覽器確認桌電畫圖面板的畫、復原、清除、取消、放進魚缸都和之前相同。
-- [ ] 3.2 實作 `src/phone/phone-page.ts`（D4），把 `main.ts` 改成依 `resolveDeviceMode` 動態載入（D3）。畫圖頁要涵蓋以下狀態：
+- [x] 3.1 從 `drawing-panel.ts` 抽出 `src/ui/drawing-editor.ts`（D4），`drawing-panel.ts` 改用它，桌電的行為不變。驗證方式：typecheck 和 build 通過；由 Claude 在瀏覽器確認桌電畫圖面板的畫、復原、清除、取消、放進魚缸都和之前相同。
+- [x] 3.2 實作 `src/phone/phone-page.ts`（D4），把 `main.ts` 改成依 `resolveDeviceMode` 動態載入（D3）。畫圖頁要涵蓋以下狀態：
   - 沒有房間代碼時的說明。
   - 編輯中、送出中、成功、失敗（分成離線、房間已滿、其他）。
 
