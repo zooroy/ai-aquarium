@@ -51,7 +51,7 @@ export class App {
       this.fish = createSchool(FISH_PARAMS.count, this.renderer.getBounds(), random);
       this.fishRenderer = new FishRenderer(this.renderer.scene, this.fish.length);
       this.cursorRenderer = new CursorRenderer(this.renderer.scene, this.renderer.camera);
-      this.handAvatar = new HandAvatar(this.renderer.scene, this.renderer.camera);
+      this.handAvatar = new HandAvatar(this.renderer.scene, this.renderer.camera, { debugRig: new URLSearchParams(location.search).has('debug') && new URLSearchParams(location.search).has('handRig') });
       this.input.register(this.handProvider);
       const ctx = { getBounds: () => this.renderer.getBounds(), random };
       this.environment.push(createLighting(this.renderer.scene, ctx));

@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { HAND_PARAMS, HAND_RENDER_PARAMS as p } from '../../config/params';
-import { handFrame } from './hand-mesh';
+import { handFrame } from './hand-rig';
 import type { HandPose } from '../../input/hand/types';
 
 /** joints 已由 provider 鏡像並翻轉 y，此處不可再翻一次。 */
