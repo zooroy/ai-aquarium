@@ -29,8 +29,8 @@
 
 ## 3. 自訂魚渲染
 
-- [ ] 3.1 把 `FishRenderer` 裡每隻魚的姿態、擺尾頻率與幅度、驚慌抖動與偏擺計算，抽成 `src/render/fish/swim-pose.ts` 的純函式，`FishRenderer` 改用它（D4）。驗證方式：既有的 `FishRenderer` 測試全部通過，並新增測試確認抽出的函式和原本的輸出相同。
-- [ ] 3.2 實作 `posterize-shader.ts` 與 `CustomFishRenderer`（D4）：每隻魚一個 Mesh，共用 UV 幾何；每隻魚的材質有自己的 map 和擺尾 uniform；在 map 之後做色階化（`levels`、`strength` 參數）；提供 `add(customId, texture)`、`remove(customId)`、`sync(fish, time)`、`dispose()`。驗證方式：
+- [x] 3.1 把 `FishRenderer` 裡每隻魚的姿態、擺尾頻率與幅度、驚慌抖動與偏擺計算，抽成 `src/render/fish/swim-pose.ts` 的純函式，`FishRenderer` 改用它（D4）。驗證方式：既有的 `FishRenderer` 測試全部通過，並新增測試確認抽出的函式和原本的輸出相同。
+- [x] 3.2 實作 `posterize-shader.ts` 與 `CustomFishRenderer`（D4）：每隻魚一個 Mesh，共用 UV 幾何；每隻魚的材質有自己的 map 和擺尾 uniform；在 map 之後做色階化（`levels`、`strength` 參數）；提供 `add(customId, texture)`、`remove(customId)`、`sync(fish, time)`、`dispose()`。驗證方式：
   - 單元測試確認 `sync` 只處理有 `customId` 的魚。
   - 擺尾 uniform 和 swim-pose 的計算一致。
   - `remove` 會釋放 geometry 以外的材質與貼圖。

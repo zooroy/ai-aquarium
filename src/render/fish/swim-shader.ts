@@ -1,8 +1,8 @@
 import type { Material } from 'three';
 import { FISH_RENDER_PARAMS as p } from '../../config/params';
 
-export function applySwimShader(material: Material, options?: { bodyLength?: number; headX?: number }): { uniforms: { uTime: { value: number } } } {
-  const uniforms = {
+export function applySwimShader(material: Material, options?: { bodyLength?: number; headX?: number }) {
+  const uniforms: Record<'uTime' | 'uSwimBodyLength' | 'uSwimHeadX' | 'uSwimBaseAmp' | 'uSwimWaveK' | 'uSwimPhase' | 'uSwimFreq' | 'uSwimAmp', { value: number }> = {
     uTime: { value: 0 }, uSwimBodyLength: { value: options?.bodyLength ?? p.bodyLength },
     uSwimHeadX: { value: options?.headX ?? p.headX }, uSwimBaseAmp: { value: p.baseAmp },
     uSwimWaveK: { value: p.waveK }, uSwimPhase: { value: p.defaultPhase },

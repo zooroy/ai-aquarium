@@ -159,6 +159,8 @@ export const ONBOARDING_PARAMS = {
 
 /** Drawing uses normalized UV coordinates; brush diameters are texture pixels. */
 export const CUSTOM_FISH_PARAMS = {
+  levels: 6,
+  strength: 0.6,
   maxCount: 20,
   scale: 1.2,
   spawnSpreadRatio: 0.05, // Central ±5% of each tank dimension.
