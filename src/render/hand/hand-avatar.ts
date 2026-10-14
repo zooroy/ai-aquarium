@@ -8,7 +8,7 @@ import type { HandPose } from '../../input/hand/types';
 import { advanceHandBubbles, bubbleOpacity, transformHandJoints, tiltHandJoints } from './hand-transforms';
 import type { HandBubble } from './hand-transforms';
 import { HAND_REST_POSES } from './hand-rest-pose';
-import { drivenBoneFrames, handedness, restBoneFrames, skinWeights, writeRigColors } from './hand-rig';
+import { articulateJoints, drivenBoneFrames, handedness, restBoneFrames, skinWeights, writeRigColors } from './hand-rig';
 
 interface Rig { mesh: SkinnedMesh; joints:Vector3[]; bones:Bone[]; fallback:readonly number[]; hand:'left'|'right'; indices:Uint16Array; weights:Float32Array }
 export interface HandAvatarOptions { load?:()=>Promise<Group>; debugRig?:boolean }
@@ -69,13 +69,16 @@ export class HandAvatar {
     for(const rig of this.rigs) {
       rig.mesh.visible=rig.hand===handedness(joints);
       if(!rig.mesh.visible) continue;
-      const frames=drivenBoneFrames(rig.joints,joints,rig.fallback);
+      // Keep the model's own proportions, then re-center its pinch midpoint on the cursor.
+      const posed=articulateJoints(rig.joints,joints);
+      const offset=target.clone().sub(posed[4].clone().add(posed[8]).multiplyScalar(.5));posed.forEach(v=>v.add(offset));
+      const frames=drivenBoneFrames(rig.joints,posed,rig.fallback);
       frames.forEach((frame,i)=>rig.bones[i].matrix.copy(frame));rig.mesh.updateMatrixWorld(true);
       const colors=rig.mesh.geometry.getAttribute('color');writeRigColors(colors.array as Float32Array,rig.indices,rig.weights,pressed,rig.fallback);colors.needsUpdate=true;
       const mat=rig.mesh.material as MeshLambertMaterial;mat.opacity=pose.opacity;mat.depthWrite=pose.opacity===1;
       // Rest landmarks follow the palm only; current landmarks show actual articulation.
       const palm=frames[0].clone().multiply(restBoneFrames(rig.joints,rig.fallback)[0].invert());
-      this.dots.forEach((dot,i)=>dot.position.copy(i<21?rig.joints[i].clone().applyMatrix4(palm):joints[i-21]));
+      this.dots.forEach((dot,i)=>dot.position.copy(i<21?rig.joints[i].clone().applyMatrix4(palm):posed[i-21]));
     }
     this.bubbles.forEach((mesh,i)=>{const bubble=this.particles[i];mesh.visible=!!bubble;if(bubble) {mesh.position.copy(bubble.position);mesh.material.opacity=pose.opacity*bubbleOpacity(bubble.age);}});
   }

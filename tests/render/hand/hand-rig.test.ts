@@ -3,7 +3,7 @@ import { Matrix4, Triangle, Vector3 } from 'three';
 import { expect, it } from 'vitest';
 import { parseGlb, deriveRest, preprocess, encodeGlb } from '../../../scripts/hand-model.mjs';
 import { HAND_REST_POSES } from '../../../src/render/hand/hand-rest-pose';
-import { boneSegments, deformationMatrices, handFrame, handedness, skinWeights, writeRigColors } from '../../../src/render/hand/hand-rig';
+import { articulateJoints, boneSegments, deformationMatrices, handFrame, handedness, skinWeights, writeRigColors } from '../../../src/render/hand/hand-rig';
 const original=parseGlb(readFileSync('public/models/low-poly-hands.glb'));
 const rest=deriveRest(original);
 const processed=original.map((m,i)=>preprocess(m,rest[i]));
@@ -158,4 +158,26 @@ it('pins wrist vertices to the palm and limits vertex stretch in replay pinch',a
     }
     expect(wristCount).toBeGreaterThan(0);expect(maxExcess).toBeLessThan(.005);
   }
+});
+it('articulates tracked joints onto the model proportions without changing its shape',async()=>{
+  const {createReplaySource,getReplayScript}=await import('../../../src/input/hand/replay-source');
+  const source=createReplaySource(getReplayScript('demo'));
+  rest.forEach((pose,model)=>{
+    const joints=pose.joints.map(p=>new Vector3(...p));
+    articulateJoints(joints,joints).forEach((v,i)=>expect(v.distanceTo(joints[i])).toBeLessThan(1e-9));
+    for(const time of [1000,5000]) {
+      const current=source.frameAt(time)!.worldLandmarks.map(p=>new Vector3(model===0?-p.x:p.x,-p.y,p.z).multiplyScalar(14));
+      const posed=articulateJoints(joints,current);
+      const scale=current[0].distanceTo(current[9])/joints[0].distanceTo(joints[9]);
+      // Palm is rigid: every pairwise palm distance scales uniformly.
+      for(const a of [0,1,5,9,13,17]) for(const b of [0,1,5,9,13,17])
+        expect(posed[a].distanceTo(posed[b])).toBeCloseTo(joints[a].distanceTo(joints[b])*scale,9);
+      // Finger segments keep rest length and follow the tracked direction.
+      for(let f=0;f<5;f++) for(let id=2+f*4;id<=4+f*4;id++) {
+        expect(posed[id].distanceTo(posed[id-1])).toBeCloseTo(joints[id].distanceTo(joints[id-1])*scale,9);
+        const want=current[id].clone().sub(current[id-1]).normalize(),got=posed[id].clone().sub(posed[id-1]).normalize();
+        expect(want.dot(got)).toBeCloseTo(1,9);
+      }
+    }
+  });
 });

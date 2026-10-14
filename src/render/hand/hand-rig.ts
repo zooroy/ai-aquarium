@@ -33,6 +33,31 @@ export function drivenBoneFrames(rest: readonly Vector3[],current: readonly Vect
   return boneSegments(fallback).map(([a,b])=>segmentFrame(current,a,b).scale(new Vector3(scale,
     current[a].distanceTo(current[b])/Math.max(rest[a].distanceTo(rest[b]),1e-9),scale)));
 }
+const PALM_JOINTS = [0, 1, 5, 9, 13, 17] as const;
+/**
+ * Re-targets tracked joints onto the model's own proportions so the mesh keeps its exact shape:
+ * the palm moves rigidly (rotation + uniform scale), and each finger segment keeps its rest length,
+ * only following the tracked direction (forward kinematics from the palm outward).
+ */
+export function articulateJoints(rest: readonly Vector3[], current: readonly Vector3[]): Vector3[] {
+  const from = handFrame(rest), to = handFrame(current);
+  const rotation = new Matrix4().makeBasis(to.across, to.up, to.normal)
+    .multiply(new Matrix4().makeBasis(from.across, from.up, from.normal).transpose());
+  const scale = current[0].distanceTo(current[9]) / Math.max(rest[0].distanceTo(rest[9]), 1e-9);
+  const place = (point: Vector3) => point.clone().sub(rest[0]).applyMatrix4(rotation).multiplyScalar(scale).add(current[0]);
+  const joints = rest.map((point) => point.clone());
+  for (const id of PALM_JOINTS) joints[id] = place(rest[id]);
+  for (let finger = 0; finger < 5; finger++) {
+    const base = 1 + finger * 4;
+    for (let id = base + 1; id <= base + 3; id++) {
+      const direction = current[id].clone().sub(current[id - 1]);
+      // Degenerate tracking keeps the rest direction carried by the palm rotation.
+      if (direction.lengthSq() < 1e-12) direction.copy(rest[id].clone().sub(rest[id - 1]).applyMatrix4(rotation));
+      joints[id] = joints[id - 1].clone().addScaledVector(direction.normalize(), rest[id].distanceTo(rest[id - 1]) * scale);
+    }
+  }
+  return joints;
+}
 export function deformationMatrices(rest: readonly Vector3[],current: readonly Vector3[],fallback: readonly number[]=[]): Matrix4[] {
   const bind=restBoneFrames(rest,fallback);
   return drivenBoneFrames(rest,current,fallback).map((matrix,i)=>matrix.multiply(bind[i].invert()));
