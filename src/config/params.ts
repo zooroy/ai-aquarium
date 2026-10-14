@@ -126,6 +126,8 @@ export const HAND_TRACKER_PARAMS = {
 } as const;
 
 export const HAND_PARAMS = {
+  invertHandednessLabel: true, // 未鏡像影像：MediaPipe Left 對應使用者右手。
+  handednessMinScore: 0.7, handednessSwitchFrames: 3,
   pinchEnter: 0.25, pinchExit: 0.40,
   // 30Hz、±0.003 均勻雜訊：標準差約 23%；0.1→0.9/300ms 停住133ms誤差約0.00091。
   minCutoff: 0.5, beta: 5, dCutoff: 1,

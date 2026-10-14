@@ -243,6 +243,13 @@ fleeTime: number;    // 進入 fleeing 後經過的秒數
   - 左手：把目前的關鍵點沿手的 across 方向鏡像成右手姿勢去驅動，再把根節點的 x 縮放設為 -1。Three.js 會依矩陣行列式自動翻轉正反面，所以不需要 DoubleSide。
   - 材質：`MeshLambertMaterial({ flatShading: true })`，`PALETTE.hand.base`；捏合時大拇指和食指末節（依 `JOINTS_0` 權重）以 vertex color 改成 glow；opacity 為 1 時 depthWrite 開啟。
   - 不播放模型內建動畫。
+  - 左右手判斷（真實鏡頭實測後修正）：使用者舉右手，畫面卻顯示左手。原因：只靠關鍵點的幾何判斷左右手，在手掌攤平時本質上分不出「右手掌心朝鏡頭」和「左手手背朝鏡頭」，因為兩者的 2D 排列相同，只能靠不可靠的深度 z；另外 replay 的合成手形不保證符合 MediaPipe 真實的座標慣例，用它驗收會被誤導。改為：
+    - **左右手以 MediaPipe 的 `handedness` 分類結果為準**。tracker 把 `result.handedness[0][0]`（`categoryName`、`score`）放進 `HandFrame.handedness`。MediaPipe 假設輸入影像已鏡像（自拍），我們送進去的是未鏡像的原始影像，所以標籤和使用者實際的手相反：`Left` 代表使用者的右手。這個對應關係放成參數 `HAND_PARAMS.invertHandednessLabel = true`，以真實鏡頭實測為準。
+    - 左右手加上遲滯，例如連續 N 幀或分數超過門檻才切換，避免閃爍。
+    - **形狀固定使用第一人稱轉換，不自動翻轉深度**（7.14 實作時 Codex 指出原本的 z 校正條件不成立：across × up 的 z 分量由 x、y 決定，反轉 z 不會改變它；同一隻手翻面時 normal.z 本來就會換號，不能拿來判斷矛盾）。左右手完全由分類結果加遲滯決定；掌心或手背朝向，由手掌框架（來自 x、y 的排列）配合選用的模型自然得出。
+    - MediaPipe 座標慣例（world landmarks）：x 是影像右方，y 向下，z 越小越靠近鏡頭。第一人稱轉換是 `(-x, -y, +z)`，行列式為 +1，是旋轉；鏡子視角則是 `(-x, -y, -z)`。
+    - replay 要加上 `handedness` 欄位，並改成符合真實慣例的右手：掌心朝鏡頭時，未鏡像影像中大拇指在 x 較大的一側，捏合時指尖的 z 變小（朝鏡頭）。
+    - `?debug` 的 overlay 加上判斷結果，例如「手:張開(右)」，方便使用者實測確認。
   - 第一人稱視角（使用者回饋「跟鏡子的反射一樣，我要跟實際的手一樣」後修正）：手的**位置**仍沿用鏡像後的游標，往右移動畫面就往右；但手的**形狀**改成「鏡像 x 加上反轉深度 z」，相當於把原始鏡頭座標繞垂直軸轉 180 度。這是旋轉不是反射，所以左右手不會對調：右手驅動右手模型、不鏡像，左手才用鏡像的右手模型；掌心朝鏡頭時，畫面上看到的是手背。左右手的判斷要以這個轉換後的座標為準。
   - 移除上一版的程序化綁骨：`hand-rig.ts` 的綁骨與權重計算、`hand-rest-pose.ts`、`scripts/derive-hand-rest-pose.mjs`、`scripts/hand-model.mjs`、`public/models/low-poly-hands*.glb`，以及只有它們用到的參數。
   - 授權標示：開場卡片與 `CREDITS.md`（Claude 已更新）改為 Cheezguzzler、Sketchfab、CC BY 4.0。

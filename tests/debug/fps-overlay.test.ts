@@ -45,10 +45,10 @@ it('shows grabbed/fleeing counts and hand press states in debug mode', async () 
   fish[0].mode='grabbed'; fish[1].mode='fleeing';
   const element={textContent:'',style:{},remove:vi.fn()};
   const overlay=createFpsOverlay('?debug',{createElement:()=>element,body:{append(){}}} as unknown as Document);
-  for (const pressed of [false,true]) {
-    overlay.setInteraction(fish,{pointers:[{id:'hand-0',source:'hand',x:.5,y:.5,pressed}]});
+  for (const pressed of [false,true]) for(const side of ['left','right'] as const) {
+    overlay.setInteraction(fish,{pointers:[{id:'hand-0',source:'hand',x:.5,y:.5,pressed}]},side);
     expect(element.textContent).toContain('抓住：1｜逃走：1');
-    expect(element.textContent).toContain(pressed?'手:捏住':'手:張開');
+    expect(element.textContent).toContain((pressed?'手:捏住':'手:張開')+(side==='right'?'(右)':'(左)'));
   }
   overlay.setInteraction(fish,{pointers:[]}); expect(element.textContent).toContain('手:無'); overlay.dispose();
 });

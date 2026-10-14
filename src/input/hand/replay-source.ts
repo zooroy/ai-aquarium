@@ -8,7 +8,7 @@ export interface ReplayScript {
   dropouts?: readonly { startMs: number; endMs: number }[];
   jitter?: boolean;
 }
-// 掌根到中指根約8cm；各指依 MCP/PIP/DIP/tip 順序排列。
+// 掌根到中指根約8cm；表格於輸出時反轉 x 成未鏡像相機中的右手（拇指在右）。
 const OPEN: readonly (readonly number[])[] = [
   [0, .08, 0], [-.035,.055,0],[-.06,.025,0],[-.08,0,0],[-.10,-.02,0],
   [-.03,0,0],[-.035,-.035,0],[-.035,-.06,0],[-.035,-.08,0],
@@ -46,7 +46,7 @@ export function createReplaySource(script: ReplayScript): { frameAt(timeMs: numb
     const mix = (a: number, b: number) => a + (b - a) * fraction;
     const pinch = Math.max(0, Math.min(1, mix(left.pinch, right.pinch)));
     const worldLandmarks: Landmark[] = OPEN.map((point, i) => ({
-      x: point[0] + (CLOSED[i][0] - point[0]) * pinch,
+      x: -(point[0] + (CLOSED[i][0] - point[0]) * pinch),
       y: point[1] + (CLOSED[i][1] - point[1]) * pinch,
       z: point[2] + (CLOSED[i][2] - point[2]) * pinch,
     }));
@@ -59,6 +59,6 @@ export function createReplaySource(script: ReplayScript): { frameAt(timeMs: numb
       x: joint.x - center.x + mix(left.x, right.x) + jitterX,
       y: joint.y - center.y + mix(left.y, right.y) + jitterY, z: joint.z,
     }));
-    return { landmarks, worldLandmarks, timestamp: timeMs };
+    return { landmarks, worldLandmarks, timestamp: timeMs, handedness: {categoryName: 'Left', score: 0.99} };
   } };
 }

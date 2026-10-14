@@ -73,6 +73,7 @@ it('retains native weights/bind matrices and bone offsets while mirroring the ou
   const scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load:()=>Promise.resolve(model),debugRig:true});await avatar.ready;
   const state=pose();
   for(const mirror of [false,true]) {
+    state.handedness=mirror?'left':'right';
     const joints=state.joints.map(p=>({...p,x:mirror?-p.x:p.x}));
     avatar.sync({...state,joints},.016,()=>new Vector3(0,0,2.5));
     expect(mesh.geometry.getAttribute('skinIndex')).toBe(indices);expect(mesh.geometry.getAttribute('skinWeight')).toBe(weights);
@@ -88,6 +89,7 @@ it('places orange retarget markers over actual driven joints after pinch alignme
   for(const time of [1000,5000]) for(const mirror of [false,true]) {
     const provider=new HandProvider();provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(time),time);
     const state=provider.getHandPose(time+100);
+    state.handedness=mirror?'left':'right';
     if(mirror) state.joints=state.joints.map(p=>({...p,x:-p.x}));
     const target=new Vector3(.3,-.2,2.5);avatar.sync(state,.016,()=>target);
     const root=scene.children[0],orange=root.children.slice(1+8+21);

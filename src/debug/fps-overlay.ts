@@ -1,3 +1,4 @@
+import type { HandSide } from '../input/hand/types';
 import type { Fish } from '../simulation/fish-state';
 import type { InputState } from '../input/types';
 import type { DetectionStats } from '../ui/camera-session';
@@ -20,7 +21,7 @@ export function createFpsCounter() {
 }
 
 export function createFpsOverlay(search: string, doc?: Document) {
-  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, setDetection(_stats: DetectionStats | undefined) {}, setInteraction(_fish: readonly Fish[], _state: InputState) {}, dispose() {} };
+  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, setDetection(_stats: DetectionStats | undefined) {}, setInteraction(_fish: readonly Fish[], _state: InputState, _side?:HandSide|null) {}, dispose() {} };
   const target = doc ?? document;
   const element = target.createElement('div');
   element.textContent = 'FPS: —';
@@ -44,9 +45,9 @@ export function createFpsOverlay(search: string, doc?: Document) {
   return { update(timestamp: number) {
     const fps = sample(timestamp);
     if (fps !== undefined) { fpsText = `FPS: ${fps.toFixed(1)}`; refresh(); }
-  }, setDetection(stats: DetectionStats | undefined) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState) {
+  }, setDetection(stats: DetectionStats | undefined) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState, side?:HandSide|null) {
     const hand = state.pointers.find((pointer) => pointer.source === 'hand');
-    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}｜手:${hand ? hand.pressed ? '捏住' : '張開' : '無'}`;
+    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}｜手:${hand ? (hand.pressed ? '捏住' : '張開') + (side ? `(${side==='right'?'右':'左'})` : '(未定)') : '無'}`;
     if (next !== interaction) { interaction = next; refresh(); }
   }, dispose() { element.remove(); } };
 }

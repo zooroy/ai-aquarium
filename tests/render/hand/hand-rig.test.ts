@@ -33,7 +33,7 @@ it('changes only swing rotations, preserving all bone lengths and following requ
 it('mirrors with negative determinant while aligning actual fingertips and preserving model proportions',()=>{
   const frame=createReplaySource(getReplayScript('demo')).frameAt(5000)!;
   for(const left of [false,true]) {
-    const points=frame.worldLandmarks.map(p=>new Vector3(left?-p.x:p.x,-p.y,p.z));
+    const points=frame.worldLandmarks.map(p=>new Vector3(left?p.x:-p.x,-p.y,p.z));
     const target=new Vector3(2,3,2.5),result=drivePose(rig,points,target,left);
     expect(Math.sign(result.placement.determinant())).toBe(left?-1:1);
     expect(result.landmarks[4].clone().add(result.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
@@ -58,7 +58,7 @@ it.each([1000,5000])('aligns retargeted targets and bends first-person pinch tip
     // Same coordinate conversion as HandProvider: x/y mirrored, z still MediaPipe depth.
     const points=frame.worldLandmarks.map(p=>new Vector3(mirror?p.x:-p.x,-p.y,p.z));
     const original=points.map(p=>p.clone()),target=new Vector3(.4,-.2,2.5);
-    const result=drivePose(rig,points,target),palmLength=points[0].distanceTo(points[9]);
+    const result=drivePose(rig,points,target,mirror),palmLength=points[0].distanceTo(points[9]);
     result.landmarks.forEach((point,i)=>expect(point.distanceTo(result.targets[i])).toBeLessThan(palmLength*.05));
     expect(handFrame(result.landmarks).normal.dot(handFrame(firstPersonLandmarks(points)).normal)).toBeGreaterThan(.9);
     expect(result.landmarks[4].clone().add(result.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
@@ -80,16 +80,16 @@ it.each([1000,5000])('aligns retargeted targets and bends first-person pinch tip
   }
 });
 it('shows the back of the right hand with thumb on the left, mirroring only the left hand',async()=>{
-  const {firstPersonLandmarks,handedness,handFrame}=await import('../../../src/render/hand/hand-rig');
+  const {firstPersonLandmarks,handFrame}=await import('../../../src/render/hand/hand-rig');
   const frame=createReplaySource(getReplayScript('demo')).frameAt(1000)!;
-  for(const left of [false,true]) {
-    const input=frame.worldLandmarks.map(p=>new Vector3(left?p.x:-p.x,-p.y,p.z));
+  for(const left of [false,true]) for(const back of [false,true]) {
+    const input=frame.worldLandmarks.map(p=>new Vector3((left?p.x:-p.x)*(back?-1:1),-p.y,p.z*(back?-1:1)));
     const shape=firstPersonLandmarks(input);
-    expect(handedness(shape)).toBe(left?'left':'right');
-    const target=new Vector3(.4,.1,2.5),driven=drivePose(rig,input,target);
+    expect(shape).toEqual(input);
+    const target=new Vector3(.4,.1,2.5),driven=drivePose(rig,input,target,left);
     expect(Math.sign(driven.placement.determinant())).toBe(left?-1:1);
     const thumbSide=driven.landmarks[4].x-driven.landmarks[9].x;
-    expect(left?thumbSide:-thumbSide).toBeGreaterThan(0);
+    expect(left!==back?thumbSide:-thumbSide).toBeGreaterThan(0);
     const worlds=boneWorldMatrices(rig.bones,driven.rotations,rig.parentMatrix);
     const root=boneIndex(rig.bones,ROOT_BONE);
     // Anatomical dorsal normal in the authored right-hand frame, transformed
@@ -97,8 +97,8 @@ it('shows the back of the right hand with thumb on the left, mirroring only the 
     const deformation=driven.placement.clone().multiply(worlds[root]).multiply(rig.restWorld[root].clone().invert());
     const {Matrix3}=await import('three');
     const backNormal=handFrame(rig.landmarks).normal.applyMatrix3(new Matrix3().getNormalMatrix(deformation)).normalize();
-    expect(backNormal.z).toBeGreaterThan(.9);
-    const moved=drivePose(rig,input,new Vector3(target.x+1,target.y,target.z));
+    expect(backNormal.z*(back?-1:1)).toBeGreaterThan(.9);
+    const moved=drivePose(rig,input,new Vector3(target.x+1,target.y,target.z),left);
     driven.landmarks.forEach((point,i)=>expect(moved.landmarks[i].clone().sub(point).distanceTo(new Vector3(1,0,0))).toBeLessThan(1e-10));
     expect(driven.landmarks[4].clone().add(driven.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
   }

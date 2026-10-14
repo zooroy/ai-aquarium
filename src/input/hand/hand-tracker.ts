@@ -1,11 +1,13 @@
 import type { HandLandmarker } from '@mediapipe/tasks-vision';
 import { HAND_TRACKER_PARAMS as p } from '../../config/params';
-import type { HandFrame, Landmark } from './types';
+import type { HandFrame, Landmark, HandClassification } from './types';
 
-export function toHandFrame(result: { landmarks: readonly (readonly Landmark[])[]; worldLandmarks: readonly (readonly Landmark[])[] }, timestamp: number): HandFrame | null {
+export function toHandFrame(result: { landmarks: readonly (readonly Landmark[])[]; worldLandmarks: readonly (readonly Landmark[])[]; handedness?: readonly (readonly HandClassification[])[] }, timestamp: number): HandFrame | null {
   const landmarks = result.landmarks[0], worldLandmarks = result.worldLandmarks[0];
   if (!landmarks?.length || !worldLandmarks?.length) return null;
+  const label=result.handedness?.[0]?.[0];
   return {
+    handedness: label ? {categoryName:label.categoryName,score:label.score} : undefined,
     landmarks: landmarks.map(({ x, y, z }) => ({ x, y, z })),
     worldLandmarks: worldLandmarks.map(({ x, y, z }) => ({ x, y, z })), timestamp,
   };

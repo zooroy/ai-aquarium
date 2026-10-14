@@ -64,15 +64,15 @@ export class HandAvatar {
     if(this.disposed) return;
     const target=screenToWorld(pose.pointer.x,pose.pointer.y,GRAB_PARAMS.holdZ);
     const joints=tiltHandJoints(transformHandJoints(pose,target));
-    this.root.visible=(pose.visible||pose.opacity>0)&&joints.length===21&&!!this.rig;
+    this.root.visible=(pose.visible||pose.opacity>0)&&joints.length===21&&!!this.rig&&pose.handedness!==null;
     if(joints.length!==21) {this.pressed=false;return;}
     const pressed=pose.visible&&pose.pressed;
     this.particles=advanceHandBubbles(this.particles,dt);
     if(pressed&&!this.pressed) this.particles=Array.from({length:p.bubbleCount},()=>({position:target.clone(),age:0,velocity:new Vector3(this.random.range(-p.bubbleSpread,p.bubbleSpread),this.random.range(p.bubbleSpeed/2,p.bubbleSpeed),this.random.range(-p.bubbleSpread,p.bubbleSpread))}));
     this.pressed=pressed;
     const rig=this.rig;
-    if(rig) {
-      const driven=drivePose(rig.definition,joints,target);
+    if(rig&&pose.handedness!==null) {
+      const driven=drivePose(rig.definition,joints,target,pose.handedness==='left');
       driven.rotations.forEach((rotation,i)=>rig.bones[i].quaternion.copy(rotation));
       this.holder.matrix.copy(driven.placement);
       this.holder.matrix.decompose(this.holder.position,this.holder.quaternion,this.holder.scale);

@@ -1,12 +1,14 @@
 import { HAND_PARAMS as p } from '../../config/params';
 import type { InputProvider, Pointer } from '../types';
 import type { HandFrame, HandPose } from './types';
+import { HandednessFilter } from './handedness';
 import { OneEuroFilter } from './one-euro';
 import { PinchDetector, pinchRatio } from './pinch';
 import { mapToScreen } from './hand-mapping';
 
 export class HandProvider implements InputProvider {
   readonly name = 'hand';
+  private readonly handedness = new HandednessFilter();
   private readonly x = new OneEuroFilter();
   private readonly y = new OneEuroFilter();
   private readonly ratio = new OneEuroFilter();
@@ -14,24 +16,26 @@ export class HandProvider implements InputProvider {
   private readonly pinch = new PinchDetector();
   private lastSeen = -Infinity;
   private now: number | undefined;
-  private pose: HandPose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false };
+  private pose: HandPose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, handedness: null };
   // 使用外部 ingest 注入，不在 provider 內持有 tracker、video 或時鐘。
   start(_target: Parameters<InputProvider['start']>[0]): void {}
   stop(): void {
     this.resetFilters(); this.lastSeen = -Infinity; this.now = undefined;
-    this.pose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false };
+    this.pose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, handedness: null };
   }
   private resetFilters(): void {
+    this.handedness.reset();
     this.x.reset(); this.y.reset(); this.ratio.reset(); this.pinch.reset();
     for (const filters of this.joints) for (const filter of filters) filter.reset();
   }
   ingest(frame: HandFrame | null, nowMs: number): void {
     if (this.now !== undefined && nowMs < this.now) return;
     this.update(nowMs);
-    if (!frame || frame.landmarks.length !== 21 || frame.worldLandmarks.length !== 21) return;
+    if (!frame || frame.landmarks.length !== 21 || frame.worldLandmarks.length !== 21) {this.handedness.update(undefined);return;}
     const ratio = pinchRatio(frame.landmarks);
     if (!Number.isFinite(ratio)) return;
     if (nowMs - this.lastSeen > p.graceMs) this.resetFilters();
+    this.pose.handedness=this.handedness.update(frame.handedness);
     const time = nowMs / 1000;
     const thumb = frame.landmarks[4], index = frame.landmarks[8];
     this.pose.pointer = mapToScreen({ x: this.x.filter((thumb.x + index.x) / 2, time), y: this.y.filter((thumb.y + index.y) / 2, time) });

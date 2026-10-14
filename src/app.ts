@@ -105,11 +105,12 @@ export class App {
       pointers: state.pointers, projectToScreen: this.renderer.projectToScreen,
     });
     this.fishRenderer?.sync(this.fish, this.time);
-    this.handAvatar?.sync(this.handProvider.getHandPose(), dt, this.renderer.screenToWorld);
+    const handPose=this.handProvider.getHandPose();
+    this.handAvatar?.sync(handPose, dt, this.renderer.screenToWorld);
     for (const module of this.environment) module.update(this.time);
     this.cursorRenderer?.sync(state, dt);
     this.renderer.render();
-    this.overlay?.setInteraction(this.fish, state);
+    this.overlay?.setInteraction(this.fish, state, handPose.handedness);
     this.overlay?.update(timestamp);
     this.frameId = requestAnimationFrame(this.frame);
   };

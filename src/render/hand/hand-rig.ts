@@ -22,7 +22,7 @@ export function handFrame(joints:readonly Vector3[]):HandFrameAxes {
 function frameRotation(points:readonly Vector3[]):Quaternion {
   const {across,up,normal}=handFrame(points);return new Quaternion().setFromRotationMatrix(new Matrix4().makeBasis(across,up,normal));
 }
-export function handedness(points:readonly Vector3[]):'left'|'right' {return handFrame(points).normal.z>=0?'right':'left';}
+
 export interface RigBone {name:string;parent:number;position:Vector3;rotation:Quaternion;scale:Vector3}
 export interface NativeRig {bones:readonly RigBone[];parentMatrix:Matrix4;restWorld:readonly Matrix4[];landmarks:readonly Vector3[];tipLocal:readonly Vector3[]}
 export function boneWorldMatrices(bones:readonly RigBone[],rotations:readonly Quaternion[],parentMatrix=new Matrix4()):Matrix4[] {
@@ -91,19 +91,12 @@ export function actualLandmarks(rig:NativeRig,worlds:readonly Matrix4[]):Vector3
     result.push(rig.tipLocal[f].clone().applyMatrix4(worlds[boneIndex(rig.bones,finger[2])]));
   });return result;
 }
-/** Provider already mirrors x for cursor movement and retains camera-space depth.
- * First convert that mirrored camera view to scene depth, then rotate its shape
- * 180 degrees around vertical (x and z together), about the wrist. This is a
- * rotation of the view, not another handedness-changing reflection. Translation
- * is applied separately by drivePose, so cursor movement is unchanged.
+/** HandProvider already applies the fixed first-person transform (-x,-y,+z).
+ * Never infer a hand label or flip depth from a palm normal: turning a hand over
+ * changes that normal without changing which hand the user is holding up.
  */
 export function firstPersonLandmarks(points:readonly Vector3[]):Vector3[] {
-  const wrist=points[0];
-  return points.map(point=> {
-    const cameraView=point.clone().sub(wrist);cameraView.z=-cameraView.z;
-    cameraView.x=-cameraView.x;cameraView.z=-cameraView.z;
-    return cameraView.add(wrist);
-  });
+  return points.map(point=>point.clone());
 }
 /** Independent forward construction: rigid model roots + observed segment directions
  * at authored lengths. It does not read the solved finger transforms.
@@ -122,9 +115,8 @@ export function retargetLandmarks(rig:NativeRig,points:readonly Vector3[]):Vecto
   });
   return targets;
 }
-export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,left?:boolean) {
+export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,left:boolean) {
   const points=firstPersonLandmarks(input);
-  left ??= handedness(points)==='left';
   const orientation=left?frameRotation(points):new Quaternion();
   const inverse=orientation.clone().invert(),origin=points[0];
   // Reflection in across becomes local X reflection in this outer frame.

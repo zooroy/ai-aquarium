@@ -33,3 +33,11 @@ it('falls back to CPU and propagates failure if both delegates fail', async () =
   mocks.create.mockRejectedValue(new Error('model failure'));
   await expect(HandTracker.create()).rejects.toThrow('model failure');
 });
+it('copies the first MediaPipe handedness category and score without using deprecated labels',()=>{
+  const handedness=[[{categoryName:'Left',score:.98}],[{categoryName:'Right',score:.8}]];
+  const frame=toHandFrame({...result,handedness},42)!;
+  expect(frame.handedness).toEqual({categoryName:'Left',score:.98});
+  handedness[0][0].score=0;
+  expect(frame.handedness?.score).toBe(.98);
+  expect(toHandFrame(result,42)?.handedness).toBeUndefined();
+});
