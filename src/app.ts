@@ -10,11 +10,14 @@ import { CustomFishRenderer } from './render/fish/custom-fish-renderer';
 import { createCustomFishFeature } from './ui/custom-fish-feature';
 import { createCaustics } from './render/environment/caustics';
 import { createBubbles } from './render/environment/bubbles';
+import { createSplash } from './render/environment/splash';
+import type { Splash } from './render/environment/splash';
 import { createSeaweed } from './render/environment/seaweed';
 import { createCoral } from './render/environment/coral';
 import { createRocks } from './render/environment/rocks';
 import { createFpsOverlay } from './debug/fps-overlay';
-import { FISH_PARAMS, SIMULATION_PARAMS } from './config/params';
+import { FISH_PARAMS, SIMULATION_PARAMS, TANK_PARAMS } from './config/params';
+import { visibleHalfWidth, visibleTopY } from './core/tank-bounds';
 import { createRandom } from './core/random';
 import { InputManager } from './input/input-manager';
 import { PointerProvider } from './input/pointer-provider';
@@ -47,6 +50,7 @@ export class App {
   private customFishRenderer: CustomFishRenderer | undefined;
   private customFish: ReturnType<typeof createCustomFishFeature> | undefined;
   private overlay: ReturnType<typeof createFpsOverlay> | undefined;
+  private splash: Splash | undefined;
 
   constructor(canvas: HTMLCanvasElement, seed: number) {
     this.renderer = new AquariumRenderer(canvas);
@@ -55,10 +59,16 @@ export class App {
       this.fish = createSchool(FISH_PARAMS.count, this.renderer.getBounds(), random);
       this.fishRenderer = new FishRenderer(this.renderer.scene, this.fish.length);
       this.customFishRenderer = new CustomFishRenderer(this.renderer.scene);
+      const splash = createSplash(this.renderer.scene, random);
+      this.splash = splash;
+      const { cameraFov, cameraPosition } = TANK_PARAMS;
       this.customFish = createCustomFishFeature({
         fish: this.fish, renderer: this.customFishRenderer, random,
         getBounds: () => this.renderer.getBounds(),
         setGrabEnabled: (enabled) => this.grab.setEnabled(enabled),
+        splash: (position) => splash.burst(position),
+        visibleTop: (z) => visibleTopY(cameraFov, cameraPosition.y, cameraPosition.z, z),
+        visibleHalfWidth: (z) => visibleHalfWidth(cameraFov, cameraPosition.z, this.renderer.aspect, z),
       });
       this.cursorRenderer = new CursorRenderer(this.renderer.scene, this.renderer.camera);
       this.handAvatar = new HandAvatar(this.renderer.scene, this.renderer.camera, { debugRig: new URLSearchParams(location.search).has('debug') && new URLSearchParams(location.search).has('handRig') });
@@ -108,6 +118,8 @@ export class App {
     }
     this.handProvider.update(timestamp);
     const state = this.input.getState();
+    // Scripted drops/departures first; stepSchool and grabbing skip those fish.
+    this.customFish?.update(dt);
     this.grab.update(state, this.fish, dt, {
       bounds: this.renderer.getBounds(), projectToScreen: this.renderer.projectToScreen,
       screenToWorld: this.renderer.screenToWorld, aspect: this.renderer.aspect,
@@ -121,6 +133,7 @@ export class App {
     const handPose=this.handProvider.getHandPose();
     this.handAvatar?.sync(handPose, dt, this.renderer.screenToWorld);
     for (const module of this.environment) module.update(this.time);
+    this.splash?.update(this.time);
     this.cursorRenderer?.sync(state, dt);
     this.renderer.render();
     this.overlay?.setInteraction(this.fish, state, handPose.handedness);
@@ -139,6 +152,7 @@ export class App {
     this.customFish?.dispose();
     this.fishRenderer?.dispose();
     this.customFishRenderer?.dispose();
+    this.splash?.dispose();
     this.cursorRenderer?.dispose();
     for (const module of [...this.environment].reverse()) module.dispose();
     this.environment.length = 0;

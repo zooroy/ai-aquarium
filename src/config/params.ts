@@ -187,7 +187,7 @@ export const CUSTOM_FISH_PARAMS = {
   dropFrontInset: 0.5, // 起點 z 離 maxZ 至少這麼遠。
   dropStartMargin: 1, // 起點高於畫面上緣的距離。
   dropPitch: Math.PI / 3, // 掉落開始時頭朝下的角度。
-  splashDepth: 0.3, // 水花在畫面上緣往下這麼深的地方。
+  splashDepth: 1.1, // 水花在畫面上緣往下這麼深的地方，留空間讓氣泡往上飄時仍在畫面內。
   // 滿了時最舊的魚游出畫面。
   leaveSpeedMultiplier: 1.5,
   leaveMargin: 1.5, // 超出畫面側緣這麼遠才移除。
@@ -196,12 +196,12 @@ export const CUSTOM_FISH_PARAMS = {
 
 /** 新魚入水時的氣泡水花（世界單位、秒）。 */
 export const SPLASH_PARAMS = {
-  poolSize: 48,
-  perBurst: 14,
-  life: 1.2,
-  radius: 0.06,
-  spread: 1.6, // 初始水平速度上限。
-  rise: 0.9, // 初始向上速度。
+  poolSize: 60,
+  perBurst: 20,
+  life: 1.4,
+  radius: 0.09,
+  spread: 1.8, // 初始水平速度上限。
+  rise: 0.5, // 初始向上速度。
   drag: 3, // 水平速度每秒衰減率。
   opacity: 0.75,
 } as const;

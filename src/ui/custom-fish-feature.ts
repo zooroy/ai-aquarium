@@ -1,8 +1,10 @@
-import { Texture } from 'three';
+import { Texture, Vector3 } from 'three';
+import { CUSTOM_FISH_PARAMS } from '../config/params';
 import type { Random } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 import type { CustomFishRenderer } from '../render/fish/custom-fish-renderer';
 import { canAddCustomFish, removeCustomFish, spawnCustomFish } from '../simulation/custom-fish';
+import { chooseFishToRetire, spawnDroppingFish, startLeaving, stepTransitions } from '../simulation/fish-transitions';
 import type { Fish } from '../simulation/fish-state';
 import { createFishInbox } from '../relay/fish-inbox';
 import type { ReceiveResult } from '../relay/fish-inbox';
@@ -18,25 +20,16 @@ import { createNotice } from './notice';
 import { createPhonePairPanel } from './phone-pair-panel';
 
 export const CUSTOM_FISH_MESSAGES = {
-  limit: '最多 20 隻自訂魚，請先在「我的魚」刪除一隻。',
   notSaved: '這隻魚不會被保存：目前無法使用瀏覽器儲存空間。',
   received: '收到一隻從手機來的魚！',
-  waiting: '有手機送來的魚在等待，請先在「我的魚」刪除一隻。',
+  replaced: '魚缸滿了，最舊的一隻魚游走了。',
+  receivedReplaced: '收到一隻從手機來的魚！最舊的一隻魚游走了。',
 } as const;
 
-/** What to do with a fish arriving from the relay, before any decoding. */
-export function receiveAction(alreadyLoaded: boolean, canAdd: boolean): 'duplicate' | 'full' | 'place' {
-  if (alreadyLoaded) return 'duplicate';
-  return canAdd ? 'place' : 'full';
-}
-
-/** Calls `show` only when the value turns from false to true. */
-export function createRisingEdge(show: () => void) {
-  let previous = false;
-  return (value: boolean) => {
-    if (value && !previous) show();
-    previous = value;
-  };
+/** The notice after a new fish arrives, or undefined when nothing needs saying. */
+export function arrivalMessage(source: 'local' | 'phone', replaced: boolean): string | undefined {
+  if (source === 'phone') return replaced ? CUSTOM_FISH_MESSAGES.receivedReplaced : CUSTOM_FISH_MESSAGES.received;
+  return replaced ? CUSTOM_FISH_MESSAGES.replaced : undefined;
 }
 
 export interface CustomFishFeatureContext {
@@ -48,6 +41,11 @@ export interface CustomFishFeatureContext {
   setGrabEnabled(enabled: boolean): void;
   /** Injectable for tests or fallbacks; defaults to IndexedDB with memory fallback. */
   openStore?: () => Promise<{ store: CustomFishStore; persistent: boolean }>;
+  /** Bubble burst where a new fish enters the water. */
+  splash(position: Vector3): void;
+  /** World y of the screen's top edge at depth z, and the visible half width at z. */
+  visibleTop(z: number): number;
+  visibleHalfWidth(z: number): number;
   /** Injectable relay; defaults to the Supabase client from env and this device's saved room code. null disables phone drawing. */
   relay?: { client: Pick<RelayClient, 'list' | 'download' | 'remove'>; room: string } | null;
 }
@@ -75,12 +73,10 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     openPanels = Math.max(0, openPanels + (open ? 1 : -1));
     ctx.setGrabEnabled(openPanels === 0);
   };
-  const customCount = () => ctx.fish.filter((item) => item.customId !== undefined).length;
+  // Fish swimming away have already left「我的魚」, so they are not counted.
+  const customCount = () => ctx.fish.filter((item) => item.customId !== undefined && item.mode !== 'leaving').length;
   const menu = createFishMenu({
-    draw: () => {
-      if (!canAddCustomFish(ctx.fish)) { notice.showNotice(CUSTOM_FISH_MESSAGES.limit); return; }
-      drawing.open();
-    },
+    draw: () => drawing.open(),
     list: () => myFish.open([...loaded.values()].map(({ id, image }) => ({ id, image }))),
     pair: () => pairPanel?.open(),
   });
@@ -89,10 +85,9 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
   const relay = ctx.relay === undefined ? defaultRelay() : ctx.relay;
   menu.setPairAvailable(relay !== null);
   const pairPanel = relay && createPhonePairPanel(phonePairUrl(location.origin + import.meta.env.BASE_URL, relay.room), { openChanged: panelChanged });
-  const showWaiting = createRisingEdge(() => notice.showNotice(CUSTOM_FISH_MESSAGES.waiting));
   const inbox = relay && createFishInbox({
     client: relay.client, room: relay.room, receive: (id, png) => receive(id, png),
-    isVisible: () => document.visibilityState === 'visible', onWaiting: showWaiting,
+    isVisible: () => document.visibilityState === 'visible', onWaiting: () => {},
   });
   const onVisibility = () => { if (document.visibilityState === 'visible') inbox?.poke(); };
   document.addEventListener('visibilitychange', onVisibility);
@@ -101,16 +96,45 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
     return ctx.fish.reduce((max, item) => Math.max(max, item.id), -1) + 1;
   }
 
-  async function place(record: CustomFishRecord): Promise<boolean> {
-    if (disposed || loaded.has(record.id) || !canAddCustomFish(ctx.fish)) return false;
+  /** When the tank is full, sends the oldest fish swimming out and forgets it locally. Returns whether one left. */
+  function makeRoom(): boolean {
+    if (canAddCustomFish(ctx.fish)) return false;
+    const id = chooseFishToRetire(loaded.keys(), ctx.fish);
+    const fish = id === undefined ? undefined : ctx.fish.find((item) => item.customId === id);
+    if (id === undefined || !fish) return false;
+    // Changing the mode also makes GrabController let go on its next update.
+    startLeaving(fish);
+    const entry = loaded.get(id);
+    if (entry) URL.revokeObjectURL(entry.url);
+    loaded.delete(id);
+    menu.setCount(customCount());
+    store?.remove(id).catch((error: unknown) => console.warn('自訂魚刪除失敗', error));
+    return true;
+  }
+
+  /**
+   * Decodes first, so a broken image never costs an old fish. New fish (`drop`) make room and fall in from the top;
+   * fish restored on reload appear in place and are skipped when the tank is somehow full.
+   */
+  async function place(record: CustomFishRecord, drop: boolean): Promise<{ placed: boolean; replaced: boolean }> {
+    const declined = { placed: false, replaced: false };
+    if (disposed || loaded.has(record.id)) return declined;
     const { image, url } = await loadImage(record.png);
-    if (disposed) { URL.revokeObjectURL(url); return false; }
-    const texture = new Texture(image);
-    ctx.renderer.add(record.id, texture);
-    ctx.fish.push(spawnCustomFish(record, ctx.getBounds(), ctx.random, nextId()));
+    if (disposed || loaded.has(record.id)) { URL.revokeObjectURL(url); return declined; }
+    const replaced = drop && makeRoom();
+    if (!canAddCustomFish(ctx.fish)) { URL.revokeObjectURL(url); return { placed: false, replaced }; }
+    ctx.renderer.add(record.id, new Texture(image));
+    const fish = drop
+      ? spawnDroppingFish(record, ctx.getBounds(), ctx.random, nextId(), ctx.visibleTop)
+      : spawnCustomFish(record, ctx.getBounds(), ctx.random, nextId());
+    ctx.fish.push(fish);
+    if (drop) {
+      const { x, z } = fish.position;
+      ctx.splash(new Vector3(x, ctx.visibleTop(z) - CUSTOM_FISH_PARAMS.splashDepth, z));
+    }
     loaded.set(record.id, { id: record.id, image, url });
     menu.setCount(customCount());
-    return true;
+    return { placed: true, replaced };
   }
 
   /** Saves a placed record; returns false (after the notice) when it will not persist. */
@@ -125,31 +149,33 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
 
   /** A fish from the phone relay. The relay id becomes the local id, so a failed remote delete never duplicates it. */
   async function receive(id: string, png: Blob): Promise<ReceiveResult> {
-    const action = receiveAction(loaded.has(id), canAddCustomFish(ctx.fish));
-    if (action === 'duplicate') return 'placed';
-    if (action === 'full') return 'full';
+    if (loaded.has(id)) return 'placed';
     const record: CustomFishRecord = { id, createdAt: Date.now(), template: 'default', png };
+    let result: { placed: boolean; replaced: boolean };
     try {
-      // place() declines when the id appeared meanwhile (done) or the tank filled up / closed (keep waiting).
-      if (!(await place(record))) return loaded.has(id) ? 'placed' : 'full';
+      result = await place(record, true);
     } catch (error) {
       console.warn('手機魚圖片無法讀取', error);
       return 'invalid';
     }
-    if (await save(record)) notice.showNotice(CUSTOM_FISH_MESSAGES.received);
+    // Declined only while closing (keep it for next time) or when it was placed meanwhile (done).
+    if (!result.placed) return loaded.has(id) ? 'placed' : 'full';
+    if (await save(record)) notice.showNotice(arrivalMessage('phone', result.replaced)!);
     return 'placed';
   }
 
   async function add(png: Blob): Promise<void> {
-    if (!canAddCustomFish(ctx.fish)) { notice.showNotice(CUSTOM_FISH_MESSAGES.limit); return; }
     const record: CustomFishRecord = { id: crypto.randomUUID(), createdAt: Date.now(), template: 'default', png };
+    let result: { placed: boolean; replaced: boolean };
     try {
-      if (!(await place(record))) return;
+      result = await place(record, true);
     } catch (error) {
       console.warn('自訂魚載入失敗', error);
       return;
     }
-    await save(record);
+    if (!result.placed) return;
+    const message = arrivalMessage('local', result.replaced);
+    if (await save(record) && message) notice.showNotice(message);
   }
 
   function remove(id: string): void {
@@ -168,7 +194,7 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
       if (disposed) return;
       store = opened.store; persistent = opened.persistent;
       for (const record of await store.list()) {
-        try { await place(record); } catch (error) { console.warn('自訂魚載入失敗', error); }
+        try { await place(record, false); } catch (error) { console.warn('自訂魚載入失敗', error); }
       }
     } catch (error) {
       console.warn('自訂魚清單讀取失敗', error);
@@ -180,6 +206,13 @@ export function createCustomFishFeature(ctx: CustomFishFeatureContext) {
   return {
     ready,
     show: () => menu.show(),
+    /** Steps falling and departing fish; departed ones leave the simulation and renderer. */
+    update(dt: number): void {
+      for (const id of stepTransitions(ctx.fish, dt, { visibleHalfWidth: ctx.visibleHalfWidth })) {
+        removeCustomFish(ctx.fish, id);
+        ctx.renderer.remove(id);
+      }
+    },
     get count(): number { return customCount(); },
     dispose(): void {
       disposed = true;
