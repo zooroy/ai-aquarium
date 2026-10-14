@@ -58,7 +58,15 @@ export function createOnboarding(callbacks: Omit<OnboardingCallbacks, 'changed'>
   const loading = document.createElement('p'); loading.textContent = '正在開啟鏡頭與載入手部追蹤…'; loading.hidden = true; loading.setAttribute('role','status');
   card.append(text,privacy,camera,mouse,loading); layer.append(card); document.body.append(layer);
   const notice = document.createElement('div'); notice.setAttribute('role','status'); notice.hidden = true;
-  Object.assign(notice.style, { position:'fixed', bottom:'16px', left:'16px', right:'16px', zIndex:'21', padding:'12px', borderRadius:'12px', background:hex(PALETTE.sand), color:hex(PALETTE.debugBackground), pointerEvents:'none', fontFamily:'system-ui' }); document.body.append(notice);
+  Object.assign(notice.style, {
+    position: 'fixed', bottom: `${ONBOARDING_PARAMS.noticeInset}px`, right: `${ONBOARDING_PARAMS.noticeInset}px`,
+    width: 'max-content', maxWidth: `calc(100vw - ${ONBOARDING_PARAMS.noticeInset * 2}px)`,
+    boxSizing: 'border-box', overflowWrap: 'anywhere', zIndex: '21',
+    padding: `${ONBOARDING_PARAMS.noticePadding}px`, borderRadius: `${ONBOARDING_PARAMS.noticeRadius}px`,
+    background: `${hex(PALETTE.sand)}ee`, color: hex(PALETTE.debugBackground),
+    boxShadow: card.style.boxShadow, pointerEvents: 'none', fontFamily: 'system-ui',
+  });
+  document.body.append(notice);
   const controller = createOnboardingController({ ...callbacks, changed(state,message) {
     layer.style.display = state === 'choosing' || state === 'loading' ? 'grid' : 'none';
     loading.hidden = state !== 'loading'; camera.disabled = mouse.disabled = state === 'loading';

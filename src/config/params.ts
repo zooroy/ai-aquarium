@@ -148,4 +148,9 @@ export const HAND_RENDER_PARAMS = {
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;
 
-export const ONBOARDING_PARAMS = { noticeSeconds: 5 } as const;
+export const ONBOARDING_PARAMS = {
+  noticeSeconds: 5,
+  noticeInset: 16, // px，右側與底部邊距；窄螢幕左右各保留同等空間。
+  noticePadding: 12,
+  noticeRadius: 12,
+} as const;
