@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { RELAY_PARAMS } from '../../src/config/params';
 
 const ROOT = new URL('../../supabase/migrations/', import.meta.url);
-const migration = new TextDecoder().decode(readFileSync(new URL('0001_fish_relay.sql', ROOT).pathname));
+const read = (name: string) => new TextDecoder().decode(readFileSync(new URL(name, ROOT).pathname));
+const migration = read('0001_fish_relay.sql');
+// 0002 needs pg_cron, which PGlite lacks; every other migration is applied in order.
+const later = [read('0003_fish_relay_order.sql')];
 const ROOM_A = 'AAAAAAAAAAAAAAAAAAAAAA';
 const ROOM_B = 'BBBBBBBBBBBBBBBBBBBBBB';
 
@@ -24,6 +27,7 @@ beforeEach(async () => {
   // Supabase provides these roles; the migration grants to them.
   await db.exec('create role anon nologin; create role authenticated nologin;');
   await db.exec(migration);
+  for (const sql of later) await db.exec(sql);
 });
 
 /** Calls a function the way PostgREST does for the browser: as the anon role. */
@@ -76,6 +80,12 @@ describe('fish relay SQL', () => {
     await expect(upload(ROOM_A)).rejects.toThrow('room-full');
     expect(await list()).toHaveLength(RELAY_PARAMS.maxPending);
     await upload(ROOM_B);
+  });
+
+  it('keeps upload order even when timestamps tie', async () => {
+    const ids = [await upload(ROOM_A), await upload(ROOM_A), await upload(ROOM_A)];
+    await db.query(`update public.relay_fish set created_at = '2000-01-01'::timestamptz + interval '1 year' * 30`);
+    expect(await list()).toEqual(ids);
   });
 
   it('lists oldest first and deletes idempotently', async () => {
