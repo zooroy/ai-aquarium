@@ -20,6 +20,7 @@ export const PALETTE = {
   debugBackground: 0x233b3b,
   cursor: 0xf0e2d5,
   cursorFist: 0x7fc8c2, // 多面體游標握拳時的顏色。
+  guideHighlight: 0xf2a65a, // 操作說明中滑鼠圖示標示的按鍵。
   lightSky: 0xffecd9,
   lightGround: 0x91bbb7,
   lightSun: 0xffe5c5,

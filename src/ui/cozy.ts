@@ -5,23 +5,23 @@ import { hexColor } from '../drawing/canvas-mapping';
 const STOPPED = ['pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'click', 'wheel'] as const;
 
 /** Full-screen layer that keeps its pointer events away from the aquarium canvas. */
-export function createLayer(label: string): { layer: HTMLDivElement; card: HTMLElement } {
-  const layer = document.createElement('div');
+export function createLayer(label: string, doc: Document = document): { layer: HTMLDivElement; card: HTMLElement } {
+  const layer = doc.createElement('div');
   Object.assign(layer.style, { position: 'fixed', inset: '0', display: 'none', placeItems: 'center', zIndex: String(ui.zIndex), cursor: 'default' });
   for (const type of STOPPED) layer.addEventListener(type, (event) => event.stopPropagation());
-  const card = document.createElement('section');
+  const card = doc.createElement('section');
   card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', label);
   Object.assign(card.style, {
     boxSizing: 'border-box', width: `min(${ui.panelMaxWidth}px, calc(100vw - 32px))`, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto',
     padding: '20px', borderRadius: '24px', background: `${hexColor(PALETTE.sand)}ee`, color: hexColor(PALETTE.debugBackground),
     boxShadow: '0 8px 32px #233b3b33', fontFamily: 'system-ui', lineHeight: '1.5',
   });
-  layer.append(card); document.body.append(layer);
+  layer.append(card); doc.body.append(layer);
   return { layer, card };
 }
 
-export function createButton(label: string, primary = false): HTMLButtonElement {
-  const button = document.createElement('button');
+export function createButton(label: string, primary = false, doc: Document = document): HTMLButtonElement {
+  const button = doc.createElement('button');
   button.type = 'button'; button.textContent = label;
   Object.assign(button.style, {
     cursor: 'pointer', border: '0', borderRadius: '12px', padding: '10px 16px', font: 'inherit',

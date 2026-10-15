@@ -1,4 +1,5 @@
 import { createNotice } from './notice';
+import { createButton } from './cozy';
 import { PALETTE } from '../config/palette';
 import { ONBOARDING_PARAMS } from '../config/params';
 import { startCameraSession } from './camera-session';
@@ -18,8 +19,8 @@ export interface OnboardingCallbacks {
   ingest(frame: HandFrame | null, now: number): void;
   report(stats: DetectionStats | undefined): void;
   clearHand(): void;
-  /** Called once the card has closed (mouse or camera mode); may be called more than once. */
-  finished?(): void;
+  /** Called once the card has closed with the chosen mode; may be called more than once (camera failure). */
+  finished?(mode: 'mouse' | 'camera'): void;
 }
 /** 可注入控制器，DOM 僅訂閱狀態；載入完成後仍持有 session 供 dispose。 */
 export function createOnboardingController(callbacks: OnboardingCallbacks, deps?: CameraDependencies) {
@@ -29,9 +30,20 @@ export function createOnboardingController(callbacks: OnboardingCallbacks, deps?
   const change = (next: OnboardingState, notice = '') => { state = next; callbacks.changed(state, notice); };
   change('choosing');
   return {
-    mouse() { if (!disposed && state === 'choosing') change('mouse'); },
+    get state() { return state; },
+    /** 開場選滑鼠，或從鏡頭模式切回滑鼠（釋放鏡頭與手部追蹤）。 */
+    mouse() {
+      if (disposed) return;
+      if (state === 'choosing') { change('mouse'); return; }
+      if (state !== 'camera') return;
+      session?.dispose(); session = undefined;
+      callbacks.clearHand(); callbacks.report(undefined); change('mouse');
+    },
+    /** 開場選鏡頭，或從滑鼠模式切到鏡頭；失敗時維持滑鼠模式並顯示提示。 */
     camera() {
-      if (disposed || state !== 'choosing') return;
+      if (disposed || (state !== 'choosing' && state !== 'mouse')) return;
+      if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+      session?.dispose(); session = undefined;
       change('loading');
       session = startCameraSession({
         ready() { if (!disposed) change('camera'); },
@@ -61,12 +73,23 @@ export function createOnboarding(callbacks: Omit<OnboardingCallbacks, 'changed'>
   const loading = document.createElement('p'); loading.textContent = '正在開啟鏡頭與載入手部追蹤…'; loading.hidden = true; loading.setAttribute('role','status');
   card.append(text,privacy,camera,mouse,loading); layer.append(card); document.body.append(layer);
   const notice = createNotice();
+  // 開場後常駐的切換按鈕；由 App 放進左下角的工具列。
+  const toggle = createButton('開啟鏡頭');
+  Object.assign(toggle.style, { display: 'none', boxShadow: '0 4px 16px #233b3b33' });
+  for (const type of ['pointerdown','pointerup','pointermove','click']) toggle.addEventListener(type, (event) => event.stopPropagation());
+  let chosen = false;
   const controller = createOnboardingController({ ...callbacks, changed(state,message) {
-    layer.style.display = state === 'choosing' || state === 'loading' ? 'grid' : 'none';
+    if (state === 'mouse' || state === 'camera') chosen = true;
+    // 開場卡只在還沒選過模式時出現；之後的載入改由切換按鈕顯示。
+    layer.style.display = !chosen && (state === 'choosing' || state === 'loading') ? 'grid' : 'none';
     loading.hidden = state !== 'loading'; camera.disabled = mouse.disabled = state === 'loading';
+    toggle.style.display = chosen ? '' : 'none';
+    toggle.disabled = state === 'loading';
+    toggle.textContent = state === 'loading' ? '鏡頭開啟中…' : state === 'camera' ? '改用滑鼠' : '開啟鏡頭';
     notice.showNotice(message);
-    if (state === 'mouse' || state === 'camera') callbacks.finished?.();
+    if (state === 'mouse' || state === 'camera') callbacks.finished?.(state);
   } });
   camera.addEventListener('click', () => controller.camera()); mouse.addEventListener('click', () => controller.mouse());
-  return { dispose() { controller.dispose(); layer.remove(); notice.dispose(); } };
+  toggle.addEventListener('click', () => { if (controller.state === 'camera') controller.mouse(); else controller.camera(); });
+  return { toggle, dispose() { controller.dispose(); layer.remove(); toggle.remove(); notice.dispose(); } };
 }

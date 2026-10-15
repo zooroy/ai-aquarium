@@ -5,6 +5,7 @@ import { createReplaySource, getReplayScript } from './input/hand/replay-source'
 import { shouldDetectFrame } from './input/hand/detection-timing';
 import { GrabController } from './simulation/grab';
 import { createOnboarding } from './ui/onboarding';
+import { createInteractionGuide } from './ui/interaction-guide';
 import { CursorRenderer } from './render/cursor-renderer';
 import { FishRenderer } from './render/fish/fish-renderer';
 import { CustomFishRenderer } from './render/fish/custom-fish-renderer';
@@ -48,6 +49,7 @@ export class App {
   private replayStart: number | undefined;
   private lastReplay = -Infinity;
   private onboarding: ReturnType<typeof createOnboarding> | undefined;
+  private guide: ReturnType<typeof createInteractionGuide> | undefined;
   private cursorRenderer: CursorRenderer | undefined;
   private fishRenderer: FishRenderer | undefined;
   private customFishRenderer: CustomFishRenderer | undefined;
@@ -88,17 +90,23 @@ export class App {
       this.environment.push(createBubbles(this.renderer.scene, ground));
       this.environment.push(createCaustics(this.renderer.scene, { ...ctx, sand }));
       this.overlay = createFpsOverlay(location.search);
+      this.guide = createInteractionGuide();
       const query = new URLSearchParams(location.search);
       if (query.has('handReplay')) {
         this.replay = createReplaySource(getReplayScript(query.get('handReplay')!));
         this.customFish.show();
+        // replay 用於驗收與截圖：只顯示按鈕，不自動擋住畫面。
+        this.guide.start('camera', { autoOpen: false });
       } else {
-        this.onboarding = createOnboarding({
+        const onboarding = createOnboarding({
           report: (stats) => this.overlay?.setDetection(stats),
           ingest: (frame, now) => this.handProvider.ingest(frame, now),
           clearHand: () => this.handProvider.stop(),
-          finished: () => this.customFish?.show(),
+          finished: (mode) => { this.customFish?.show(); this.guide?.start(mode); },
         });
+        this.onboarding = onboarding;
+        // 鏡頭／滑鼠切換按鈕和「操作說明」放在同一個左下角工具列。
+        this.guide.toolbar.append(onboarding.toggle);
       }
       this.input.register(this.pointer);
       this.pointer.start(canvas);
@@ -155,6 +163,7 @@ export class App {
     this.frameId = undefined;
     this.pointer.stop();
     this.onboarding?.dispose();
+    this.guide?.dispose();
     this.handProvider.stop();
     this.handAvatar?.dispose();
     this.mouseAvatar?.dispose();

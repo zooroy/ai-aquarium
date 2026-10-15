@@ -20,9 +20,35 @@ function fixture() {
 beforeEach(()=>vi.spyOn(console,'warn').mockImplementation(()=>{}));
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 it('mouse selection never requests permission or initializes tracking', async()=>{
- const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.mouse(); c.camera(); await flush();
+ const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.mouse(); c.mouse(); await flush();
  expect(f.deps.getUserMedia).not.toHaveBeenCalled(); expect(f.deps.createTracker).not.toHaveBeenCalled();
- expect(f.callbacks.changed).toHaveBeenLastCalledWith('mouse',''); c.dispose();
+ expect(f.callbacks.changed).toHaveBeenLastCalledWith('mouse',''); expect(c.state).toBe('mouse'); c.dispose();
+});
+it('switches from mouse to camera after the opening choice',async()=>{
+ const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.mouse(); c.camera();
+ expect(c.state).toBe('loading'); c.mouse(); c.camera(); expect(c.state).toBe('loading'); // 載入中忽略切換
+ await flush(); expect(c.state).toBe('camera'); expect(f.deps.getUserMedia).toHaveBeenCalledOnce();
+ f.tick(); expect(f.provider.getPointers()).toHaveLength(1); c.dispose();
+});
+it('switches from camera back to mouse and releases the camera',async()=>{
+ const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.camera(); await flush(); f.tick();
+ expect(f.provider.getPointers()).toHaveLength(1);
+ c.mouse();
+ expect(c.state).toBe('mouse'); expect(f.callbacks.changed).toHaveBeenLastCalledWith('mouse','');
+ expect(f.stop).toHaveBeenCalledOnce(); expect(f.close).toHaveBeenCalledOnce();
+ expect(f.callbacks.clearHand).toHaveBeenCalled(); expect(f.callbacks.report).toHaveBeenLastCalledWith(undefined);
+ expect(f.provider.getPointers()).toHaveLength(0);
+ c.camera(); await flush(); expect(c.state).toBe('camera'); expect(f.deps.getUserMedia).toHaveBeenCalledTimes(2);
+ c.dispose(); expect(f.stop).toHaveBeenCalledTimes(2);
+});
+it('stays in mouse mode with a notice when switching to the camera fails, and can retry',async()=>{
+ vi.useFakeTimers(); const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.mouse();
+ vi.mocked(f.deps.getUserMedia!).mockRejectedValueOnce({name:'NotAllowedError'});
+ c.camera(); await flush();
+ expect(c.state).toBe('mouse'); expect(f.callbacks.changed).toHaveBeenLastCalledWith('mouse',CAMERA_MESSAGES.permission);
+ c.camera(); await flush(); expect(c.state).toBe('camera');
+ vi.advanceTimersByTime(10000); expect(c.state).toBe('camera'); // 舊的提示計時器不會把狀態改回滑鼠
+ c.dispose();
 });
 it('loads once, hides video, detects and ingests while camera is running', async()=>{
  const f=fixture(), c=createOnboardingController(f.callbacks,f.deps); c.camera(); c.camera(); c.mouse();

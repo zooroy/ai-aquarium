@@ -157,6 +157,14 @@ export const HAND_RENDER_PARAMS = {
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;
 
+/** 操作說明卡的版面數值（px）。 */
+export const GUIDE_PARAMS = {
+  cardMaxWidth: 720,
+  itemMinWidth: 180, // 小於這個寬度就換行，窄螢幕自動變成上下排列。
+  imageSize: 120,
+  buttonInset: 16,
+} as const;
+
 export const ONBOARDING_PARAMS = {
   noticeSeconds: 5,
   noticeInset: 16, // px，右側與底部邊距；窄螢幕左右各保留同等空間。
