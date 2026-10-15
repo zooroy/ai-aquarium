@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, Vector3, Mesh, MeshLambertMaterial, FrontSide, Group, BufferGeometry, Float32BufferAttribute, SkinnedMesh } from 'three';
+import { PerspectiveCamera, Scene, Vector3, Mesh, MeshStandardMaterial, Texture, FrontSide, Group, BufferGeometry, Float32BufferAttribute, SkinnedMesh } from 'three';
 import { expect, it, vi } from 'vitest';
 import { HandAvatar } from '../../../src/render/hand/hand-avatar';
 import { advanceHandBubbles, bubbleOpacity, transformHandJoints } from '../../../src/render/hand/hand-transforms';
@@ -6,10 +6,11 @@ import { HandProvider } from '../../../src/input/hand/hand-provider';
 import { createReplaySource, getReplayScript } from '../../../src/input/hand/replay-source';
 import { HAND_PARAMS, HAND_RENDER_PARAMS } from '../../../src/config/params';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { readNativeFixture } from './glb-fixture';
+import { readNativeFixture, texturelessGlb } from './glb-fixture';
 async function load() {
-  const {bytes}=readNativeFixture();
-  return (await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer,'')).scene;
+  const model=(await new GLTFLoader().parseAsync(texturelessGlb(),'')).scene;
+  model.traverse(o=>{if(o instanceof SkinnedMesh) (o.material as MeshStandardMaterial).map=new Texture();});
+  return model;
 }
 function pose() { const provider = new HandProvider(); provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(0), 0); return provider.getHandPose(300); }
 it('keeps provider mirror/y-up and aligns pinch midpoint without scaling camera distance', () => {
@@ -37,11 +38,12 @@ it('loads skinned hands asynchronously, fades, updates depthWrite and releases r
   const root=scene.children[0], hands:SkinnedMesh[]=[];root.traverse(c=>{if(c instanceof SkinnedMesh)hands.push(c);});
   expect(hands).toHaveLength(1);
   const hand=hands.find(h=>h.visible)!;
-  expect(hand.skeleton.bones).toHaveLength(21);
-  const mat=hand.material as MeshLambertMaterial;expect(mat.side).toBe(FrontSide);expect(mat.depthWrite).toBe(true);
-  const colors=hand.geometry.getAttribute('color'),base=Array.from(colors.array);
+  expect(hand.skeleton.bones).toHaveLength(readNativeFixture().json.skins[0].joints.length);
+  const mat=hand.material as MeshStandardMaterial;expect(mat.side).toBe(FrontSide);expect(mat.depthWrite).toBe(true);
+  expect(mat.map).toBeInstanceOf(Texture);expect(mat.vertexColors).toBe(false);
+  expect(hand.geometry.getAttribute('color')).toBeUndefined();const base=mat.color.clone();
   avatar.sync({...state,pressed:true,opacity:.5},.01,()=>new Vector3(0,0,2));
-  expect(mat.depthWrite).toBe(false);expect(Array.from(colors.array)).not.toEqual(base);
+  expect(mat.depthWrite).toBe(false);expect(mat.color).toEqual(base);
   expect(root.children.slice(1,9).filter(c=>c.visible)).toHaveLength(8);
   avatar.sync({...state,pressed:true},.81,()=>new Vector3(0,0,2));expect(root.children.slice(1,9).every(c=>!c.visible)).toBe(true);
   avatar.sync({...state,visible:false,opacity:0},.1,()=>new Vector3());expect(root.visible).toBe(false);
@@ -84,7 +86,7 @@ it('retains native weights/bind matrices and bone offsets while mirroring the ou
   avatar.dispose();
 });
 it('places orange retarget markers over actual driven joints after pinch alignment for either hand',async()=>{
-  const {ROOT_BONE,FINGER_BONES,loadedBoneName}=await import('../../../src/render/hand/hand-rig');
+  const {ROOT_BONE,FINGER_BONES,loadedBoneName,pinchAssistWeight}=await import('../../../src/render/hand/hand-rig');
   const fixture=readNativeFixture(),scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load,debugRig:true});await avatar.ready;
   for(const time of [1000,5000]) for(const mirror of [false,true]) {
     const provider=new HandProvider();provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(time),time);
@@ -93,21 +95,25 @@ it('places orange retarget markers over actual driven joints after pinch alignme
     if(mirror) state.joints=state.joints.map(p=>({...p,x:-p.x}));
     const target=new Vector3(.3,-.2,2.5);avatar.sync(state,.016,()=>target);
     const root=scene.children[0],orange=root.children.slice(1+8+21);
-    const bones=[ROOT_BONE,...FINGER_BONES.flatMap(f=>[...f,'tip'])];
-    const actual=bones.map((name,i)=>{
-      if(name==='tip') {
-        const finger=(i-4)/4,bone=root.getObjectByName(loadedBoneName(FINGER_BONES[finger][2]))!;
-        return fixture.rig.tipLocal[finger].clone().applyMatrix4(bone.matrixWorld);
-      }
-      return root.getObjectByName(loadedBoneName(name))!.getWorldPosition(new Vector3());
-    });
+    const bones=[ROOT_BONE,...FINGER_BONES.flat()];
+    const actual=bones.map(name=>root.getObjectByName(loadedBoneName(name))!.getWorldPosition(new Vector3()));
     const palm=actual[0].distanceTo(actual[9]);
-    actual.forEach((point,i)=>expect(point.distanceTo(orange[i].position)).toBeLessThan(palm*.05));
+    actual.forEach((point,i)=>{if(i>=2&&i<=8&&pinchAssistWeight(state.joints.map(p=>new Vector3(p.x,p.y,p.z)))>0)return;expect(point.distanceTo(orange[i].position)).toBeLessThan(palm*.05);});
     expect(actual[4].clone().add(actual[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-5);
     if(time===5000) {
       const center=[0,5,9,13,17].reduce((v,i)=>v.add(actual[i]),new Vector3()).divideScalar(5);
       expect(actual[4].z).toBeLessThan(center.z);expect(actual[8].z).toBeLessThan(center.z);
     }
   }
+  avatar.dispose();
+});
+
+it('classifies the right-hand replay as right and mirrors the native left glove',async()=>{
+  const state=pose();
+  expect(state.handedness).toBe('right');
+  const scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load});
+  await avatar.ready;
+  avatar.sync(state,0,()=>new Vector3(0,0,2.5));
+  expect(scene.children[0].children[0].matrix.determinant()).toBeLessThan(0);
   avatar.dispose();
 });

@@ -126,7 +126,7 @@ export const HAND_TRACKER_PARAMS = {
 } as const;
 
 export const HAND_PARAMS = {
-  invertHandednessLabel: true, // 未鏡像影像：MediaPipe Left 對應使用者右手。
+  invertHandednessLabel: false, // MediaPipe Tasks 在未鏡像影像上的標籤即為使用者實際的手
   handednessMinScore: 0.7, handednessSwitchFrames: 3,
   pinchEnter: 0.25, pinchExit: 0.40,
   // 30Hz、±0.003 均勻雜訊：標準差約 23%；0.1→0.9/300ms 停住133ms誤差約0.00091。
@@ -144,8 +144,11 @@ export const GRAB_PARAMS = {
 } as const;
 
 export const HAND_RENDER_PARAMS = {
+  pinchAssistNear: 0.3,
+  pinchAssistFar: 0.6,
+  pinchAssistIterations: 8,
+  rigDotRadius: 0.025,
   renderOrder: 10, displayTiltAcross: 0, displayTiltUp: 0,
-  rigDotRadius: 0.025, tipCapRatio: 0.01,
   bubbleCount: 8, bubbleLife: 0.8,
   bubbleRadius: 0.055, bubbleSpeed: 0.8, bubbleSpread: 0.4, bubbleSeed: 83,
 } as const;

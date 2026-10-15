@@ -59,6 +59,6 @@ export function createReplaySource(script: ReplayScript): { frameAt(timeMs: numb
       x: joint.x - center.x + mix(left.x, right.x) + jitterX,
       y: joint.y - center.y + mix(left.y, right.y) + jitterY, z: joint.z,
     }));
-    return { landmarks, worldLandmarks, timestamp: timeMs, handedness: {categoryName: 'Left', score: 0.99} };
+    return { landmarks, worldLandmarks, timestamp: timeMs, handedness: {categoryName: 'Right', score: 0.99} };
   } };
 }

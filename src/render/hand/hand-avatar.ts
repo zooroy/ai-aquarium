@@ -1,4 +1,4 @@
-import { Bone, Float32BufferAttribute, Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, SkinnedMesh, Vector3 } from 'three';
+import { Bone, FrontSide, Texture, Group, IcosahedronGeometry, Mesh, MeshLambertMaterial, SkinnedMesh, Vector3 } from 'three';
 import type { PerspectiveCamera, Scene } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { GRAB_PARAMS, HAND_RENDER_PARAMS as p } from '../../config/params';
@@ -8,12 +8,11 @@ import { assetUrl } from '../../core/asset-url';
 import type { HandPose } from '../../input/hand/types';
 import { advanceHandBubbles, bubbleOpacity, transformHandJoints, tiltHandJoints } from './hand-transforms';
 import type { HandBubble } from './hand-transforms';
-import { ROOT_BONE, PALM_BONES, FINGER_BONES, loadedBoneName, makeNativeRig, drivePose, writeNativeColors } from './hand-rig';
+import { ROOT_BONE, FINGER_BONES, loadedBoneName, makeNativeRig, drivePose, MODEL_HANDEDNESS } from './hand-rig';
 import type { NativeRig, RigBone } from './hand-rig';
 
 interface Rig { mesh:SkinnedMesh; bones:Bone[]; definition:NativeRig; model:Group }
 export interface HandAvatarOptions { load?:()=>Promise<Group>; debugRig?:boolean }
-const material=()=>new MeshLambertMaterial({color:0xffffff,flatShading:true,vertexColors:true,transparent:true});
 export class HandAvatar {
   private readonly root=new Group();
   private rig:Rig|undefined;
@@ -36,26 +35,26 @@ export class HandAvatar {
       const dot=new Mesh(new IcosahedronGeometry(p.rigDotRadius,0),new MeshLambertMaterial({color:i<21?PALETTE.hand.rigBones:PALETTE.hand.rigCurrent,depthTest:false}));
       dot.renderOrder=p.renderOrder+1;this.dots.push(dot);this.root.add(dot);
     }
-    const load=options.load??(async()=> (await new GLTFLoader().loadAsync(assetUrl('models/vr-hand-right.glb'))).scene);
+    const load=options.load??(async()=> (await new GLTFLoader().loadAsync(assetUrl('models/glove-hand.glb'))).scene);
     this.ready=Promise.resolve().then(load).then(model=>{
       if(this.disposed) {this.disposeModel(model);return;}
       try {
         model.updateMatrixWorld(true);
-        for(const name of [ROOT_BONE,...PALM_BONES,...FINGER_BONES.flat()]) {
+        for(const name of [ROOT_BONE,...FINGER_BONES.flat()]) {
           if(!(model.getObjectByName(loadedBoneName(name)) instanceof Bone)) throw Error(`Missing hand bone ${name}`);
         }
         let mesh:SkinnedMesh|undefined;
-        model.traverse(object=>{if(object instanceof SkinnedMesh) mesh=object;});
+        const extras:SkinnedMesh[]=[];
+        model.traverse(object=>{if(object instanceof SkinnedMesh) {if(!mesh) mesh=object;else extras.push(object);}});
+        for(const extra of extras) { extra.removeFromParent(); this.disposeModel(extra); }
         if(!mesh) throw Error('Missing skinned hand');
         const hand:SkinnedMesh=mesh,bones=hand.skeleton.bones;
         const snapshot:RigBone[]=bones.map(bone=>({name:bone.name,parent:bones.indexOf(bone.parent as Bone),position:bone.position.clone(),rotation:bone.quaternion.clone(),scale:bone.scale.clone()}));
-        const root=model.getObjectByName(ROOT_BONE)!;
-        const positions=hand.geometry.getAttribute('position');
-        const vertices=Array.from({length:positions.count},(_,i)=>new Vector3().fromBufferAttribute(positions,i).applyMatrix4(hand.matrixWorld));
-        const indices=hand.geometry.getAttribute('skinIndex'),weights=hand.geometry.getAttribute('skinWeight');
-        const definition=makeNativeRig(snapshot,root.parent!.matrixWorld.clone(),vertices,indices.array,weights.array);
-        for(const mat of Array.isArray(hand.material)?hand.material:[hand.material]) mat.dispose();
-        hand.material=material();hand.geometry.setAttribute('color',new Float32BufferAttribute(new Float32Array(positions.count*3),3));
+        const root=bones.find(bone=>!bones.includes(bone.parent as Bone))!;
+        const definition=makeNativeRig(snapshot,root.parent!.matrixWorld.clone());
+        for(const mat of Array.isArray(hand.material)?hand.material:[hand.material]) {
+          mat.transparent=true; mat.side=FrontSide;
+        }
         hand.frustumCulled=false;hand.renderOrder=p.renderOrder;
         this.holder.add(model);this.rig={mesh:hand,bones,definition,model};
       } catch(error) {this.disposeModel(model);throw error;}
@@ -73,21 +72,21 @@ export class HandAvatar {
     this.pressed=pressed;
     const rig=this.rig;
     if(rig&&pose.handedness!==null) {
-      const driven=drivePose(rig.definition,joints,target,pose.handedness==='left');
+      const driven=drivePose(rig.definition,joints,target,pose.handedness!==MODEL_HANDEDNESS);
       driven.rotations.forEach((rotation,i)=>rig.bones[i].quaternion.copy(rotation));
       this.holder.matrix.copy(driven.placement);
       this.holder.matrix.decompose(this.holder.position,this.holder.quaternion,this.holder.scale);
       this.holder.updateMatrixWorld(true);
-      const colors=rig.mesh.geometry.getAttribute('color');
-      writeNativeColors(colors.array as Float32Array,rig.mesh.geometry.getAttribute('skinIndex').array,rig.mesh.geometry.getAttribute('skinWeight').array,rig.definition.bones,pressed);
-      colors.needsUpdate=true;
-      this.dots.forEach((dot,i)=>{if(i<21) rig.bones[i].getWorldPosition(dot.position);else dot.position.copy(driven.targets[i-21]);});
+      this.dots.forEach((dot,i)=>{if(i<21) dot.position.copy(driven.landmarks[i]);else dot.position.copy(driven.targets[i-21]);});
     }
-    if(rig) {const mat=rig.mesh.material as MeshLambertMaterial;mat.opacity=pose.opacity;mat.depthWrite=pose.opacity===1;}
+    if(rig) for(const mat of Array.isArray(rig.mesh.material)?rig.mesh.material:[rig.mesh.material]) {mat.opacity=pose.opacity;mat.depthWrite=pose.opacity===1;}
     this.bubbles.forEach((mesh,i)=>{const bubble=this.particles[i];mesh.visible=!!bubble;if(bubble) {mesh.position.copy(bubble.position);mesh.material.opacity=pose.opacity*bubbleOpacity(bubble.age);}});
   }
-  private disposeModel(model:Group):void {
-    model.traverse(object=>{if(object instanceof Mesh) {object.geometry.dispose();for(const mat of Array.isArray(object.material)?object.material:[object.material]) mat.dispose();if(object instanceof SkinnedMesh) object.skeleton.dispose();}});
+  private disposeModel(model:Group|SkinnedMesh):void {
+    model.traverse(object=>{if(object instanceof Mesh) {object.geometry.dispose();for(const mat of Array.isArray(object.material)?object.material:[object.material]) {
+      for(const value of Object.values(mat)) if(value instanceof Texture) value.dispose();
+      mat.dispose();
+    }if(object instanceof SkinnedMesh) object.skeleton.dispose();}});
   }
   private releaseRigs():void {if(this.rig) {this.holder.remove(this.rig.model);this.disposeModel(this.rig.model);this.rig=undefined;}}
   dispose():void {this.disposed=true;this.scene.remove(this.root);this.releaseRigs();for(const mesh of [...this.bubbles,...this.dots]) {mesh.geometry.dispose();mesh.material.dispose();}this.particles=[];}
