@@ -14,6 +14,8 @@ export interface HandPose {
   opacity: number;             // 0..1，用於淡入淡出（hand-avatar spec）
   joints: Landmark[];          // 21 個，已平滑、已鏡像、y 向上，單位公尺
   pointer: { x: number; y: number };  // 和 hand-0 游標相同
+  fist: boolean;
+  fistRatio: number;
   pressed: boolean;
   handedness: HandSide | null; // 經標籤反轉與遲滯後的使用者左右手。
 }

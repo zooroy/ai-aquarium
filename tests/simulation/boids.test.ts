@@ -10,7 +10,7 @@ import type { Pointer } from '../../src/input/types';
 
 const bounds = computeTankBounds({ fovDeg: TANK_PARAMS.cameraFov, cameraZ: TANK_PARAMS.cameraPosition.z, aspect: 16 / 9 });
 const projectToScreen = (p: Vector3) => ({ x: 0.5 + p.x / 10, y: 0.5 - p.y / 10 });
-const context = { bounds, time: 0, pointers: [] as readonly Pointer[], projectToScreen };
+const context = { screenToWorld: (x:number,y:number,z:number)=>new Vector3((x-.5)*10,(.5-y)*10,z), bounds, time: 0, pointers: [] as readonly Pointer[], projectToScreen };
 const coherence = (fish: Fish[]) => fish.reduce((sum, f) => sum.add(f.velocity.clone().normalize()), new Vector3()).length() / fish.length;
 
 describe('stepSchool', () => {
@@ -73,7 +73,7 @@ describe('stepSchool', () => {
   it('reduces the number of fish near a stationary cursor after one second', () => {
     const fish = createSchool(40, { min: { x: -0.9, y: -0.9, z: -1 }, max: { x: 0.9, y: 0.9, z: 1 } }, createRandom(42));
     const control = createSchool(40, { min: { x: -0.9, y: -0.9, z: -1 }, max: { x: 0.9, y: 0.9, z: 1 } }, createRandom(42));
-    const pointers: Pointer[] = [{ id: 'mouse', x: 0.5, y: 0.5, pressed: false, source: 'mouse' }];
+    const pointers: Pointer[] = [{ id: 'mouse', x: 0.5, y: 0.5, fist: false, pressed: false, source: 'mouse' }];
     const nearCount = (school: Fish[]) => school.filter((f) => {
       const p = projectToScreen(f.position);
       return Math.hypot(p.x - 0.5, p.y - 0.5) < CURSOR_PARAMS.avoidanceRadius;
@@ -137,7 +137,7 @@ it('caps summed acceleration before applying speed limits', () => {
   const before = fish[0].velocity.clone();
   stepSchool(fish, 1 / 60, {
     ...context,
-    pointers: [{ id: 'mouse', x: 0.5, y: 0.5, pressed: false, source: 'mouse' }],
+    pointers: [{ id: 'mouse', x: 0.5, y: 0.5, fist: false, pressed: false, source: 'mouse' }],
   });
   expect(before.distanceTo(fish[0].velocity)).toBeCloseTo(FISH_PARAMS.maxSteeringForce / 60, 12);
 });

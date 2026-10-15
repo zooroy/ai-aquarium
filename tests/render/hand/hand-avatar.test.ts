@@ -42,10 +42,10 @@ it('loads skinned hands asynchronously, fades, updates depthWrite and releases r
   const mat=hand.material as MeshStandardMaterial;expect(mat.side).toBe(FrontSide);expect(mat.depthWrite).toBe(true);
   expect(mat.map).toBeInstanceOf(Texture);expect(mat.vertexColors).toBe(false);
   expect(hand.geometry.getAttribute('color')).toBeUndefined();const base=mat.color.clone();
-  avatar.sync({...state,pressed:true,opacity:.5},.01,()=>new Vector3(0,0,2));
+  avatar.sync({...state,fist: false, pressed: true,opacity:.5},.01,()=>new Vector3(0,0,2));
   expect(mat.depthWrite).toBe(false);expect(mat.color).toEqual(base);
   expect(root.children.slice(1,9).filter(c=>c.visible)).toHaveLength(8);
-  avatar.sync({...state,pressed:true},.81,()=>new Vector3(0,0,2));expect(root.children.slice(1,9).every(c=>!c.visible)).toBe(true);
+  avatar.sync({...state,fist: false, pressed: true},.81,()=>new Vector3(0,0,2));expect(root.children.slice(1,9).every(c=>!c.visible)).toBe(true);
   avatar.sync({...state,visible:false,opacity:0},.1,()=>new Vector3());expect(root.visible).toBe(false);
   avatar.dispose();expect(scene.children).toHaveLength(0);
 });

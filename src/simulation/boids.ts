@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { createNoise3D } from 'simplex-noise';
-import { FISH_PARAMS as params, GRAB_PARAMS } from '../config/params';
+import { FISH_PARAMS as params, GRAB_PARAMS, FIST_GATHER_PARAMS } from '../config/params';
 import { createRandom } from '../core/random';
 import type { TankBounds } from '../core/tank-bounds';
 import type { Pointer } from '../input/types';
@@ -9,9 +9,12 @@ import type { Fish } from './fish-state';
 import { SpatialGrid } from './spatial-grid';
 import { computeAvoidanceForce } from './cursor-avoidance';
 
+import { gatherCenters, computeGatherForce } from './fist-gather';
+
 const noise = createNoise3D(createRandom(params.wanderSeed).next);
 
 export function stepSchool(fish: Fish[], dt: number, ctx: {
+  screenToWorld: (x: number, y: number, z: number) => Vector3;
   bounds: TankBounds;
   time: number;
   pointers: readonly Pointer[];
@@ -19,6 +22,7 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
 }): void {
   if (!Number.isFinite(dt) || dt < 0) throw new RangeError('Expected finite nonnegative dt');
   if (dt === 0) return;
+  const centers = gatherCenters(ctx.pointers, ctx.screenToWorld);
   const grid = new SpatialGrid();
   grid.rebuild(fish);
   // 先計算全部力再更新，避免陣列順序影響鄰居狀態。
@@ -44,19 +48,22 @@ export function stepSchool(fish: Fish[], dt: number, ctx: {
         count++;
       }
     }
+    const gather = computeGatherForce(item, centers);
+    const flockScale = gather ? FIST_GATHER_PARAMS.flockScale : 1;
     const force = new Vector3();
     separation.multiplyScalar(params.separationWeight);
     if (count > 0) {
       alignment.divideScalar(count).multiplyScalar(params.maxSpeed).sub(item.velocity);
       center.divideScalar(count).sub(item.position);
-      force.addScaledVector(alignment, params.alignmentWeight);
-      force.addScaledVector(center, params.cohesionWeight);
+      force.addScaledVector(alignment, params.alignmentWeight * flockScale);
+      force.addScaledVector(center, params.cohesionWeight * flockScale);
     }
     const t = ctx.time * params.wanderFrequency;
     const wander = new Vector3(
       noise(item.phase, t, 0), noise(item.phase, t, 1), noise(item.phase, t, 2),
     );
-    force.addScaledVector(wander, params.wanderStrength * params.wanderWeight);
+    force.addScaledVector(wander, params.wanderStrength * params.wanderWeight * flockScale);
+    if (gather) force.addScaledVector(gather, FIST_GATHER_PARAMS.gatherWeight);
     for (const axis of ['x', 'y', 'z'] as const) {
       const low = Math.max(0, 1 - (item.position[axis] - ctx.bounds.min[axis]) / params.boundaryAvoidanceRadius);
       const high = Math.max(0, 1 - (ctx.bounds.max[axis] - item.position[axis]) / params.boundaryAvoidanceRadius);

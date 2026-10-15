@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PointerProvider } from '../../src/input/pointer-provider';
 
 // 僅模擬 provider 使用的 target/事件介面，無 DOM 或 jsdom。
@@ -34,13 +34,13 @@ describe('PointerProvider', () => {
     expect(provider.name).toBe('pointer');
     expect(provider.getPointers()).toEqual([]);
     expect(target.style).toEqual({ touchAction: 'none', cursor: 'none' });
-    expect(target.listeners.size).toBe(5);
+    expect(target.listeners.size).toBe(6);
   });
 
   it('normalizes (250,125) in a 1000x500 target', () => {
     const { target, provider } = setup();
     target.emit('pointermove');
-    expect(provider.getPointers()).toEqual([{ id: 'mouse', x: 0.25, y: 0.25, pressed: false, source: 'mouse' }]);
+    expect(provider.getPointers()).toEqual([{ id: 'mouse', x: 0.25, y: 0.25, fist: false, pressed: false, source: 'mouse' }]);
   });
 
   it('uses target offsets, current dimensions and clamps coordinates', () => {
@@ -52,12 +52,12 @@ describe('PointerProvider', () => {
     expect(provider.getPointers()[0]).toMatchObject({ x: 0, y: 1 });
   });
 
-  it('tracks only the mouse left button and removes the mouse on leave', () => {
+  it('prioritizes right button over left and removes the mouse on leave', () => {
     const { target, provider } = setup();
     target.emit('pointerdown', { buttons: 2 });
     expect(provider.getPointers()[0].pressed).toBe(false);
-    target.emit('pointerdown', { buttons: 3 });
-    expect(provider.getPointers()[0].pressed).toBe(true);
+    target.emit('pointermove', { buttons: 3 });
+    expect(provider.getPointers()[0]).toMatchObject({pressed:false,fist:true});
     target.emit('pointermove', { buttons: 1 });
     expect(provider.getPointers()[0].pressed).toBe(true);
     target.emit('pointerup', { buttons: 0 });
@@ -71,15 +71,15 @@ describe('PointerProvider', () => {
     target.emit('pointerdown', { pointerType: 'touch', pointerId: 3 });
     target.emit('pointerdown', { pointerType: 'touch', pointerId: 7 });
     expect(provider.getPointers()).toEqual([
-      { id: 'touch-3', x: 0.25, y: 0.25, pressed: true, source: 'touch' },
-      { id: 'touch-7', x: 0.25, y: 0.25, pressed: true, source: 'touch' },
+      { id: 'touch-3', x: 0.25, y: 0.25, fist: false, pressed: true, source: 'touch' },
+      { id: 'touch-7', x: 0.25, y: 0.25, fist: false, pressed: true, source: 'touch' },
     ]);
     target.emit('pointermove', { pointerType: 'touch', pointerId: 7, clientX: 500 });
     target.emit('pointerleave', { pointerType: 'touch', pointerId: 7 });
     expect(provider.getPointers()).toHaveLength(2);
     target.emit(end, { pointerType: 'touch', pointerId: 3 });
     expect(provider.getPointers()).toEqual([
-      { id: 'touch-7', x: 0.5, y: 0.25, pressed: true, source: 'touch' },
+      { id: 'touch-7', x: 0.5, y: 0.25, fist: false, pressed: true, source: 'touch' },
     ]);
     target.emit(end, { pointerType: 'touch', pointerId: 7 });
     expect(provider.getPointers()).toEqual([]);
@@ -89,7 +89,7 @@ describe('PointerProvider', () => {
     const { target, provider } = setup();
     target.emit('pointermove');
     target.emit('pointerdown', { pointerType: 'pen', buttons: 1 });
-    expect(provider.getPointers()[1]).toMatchObject({ id: 'pen', source: 'mouse', pressed: true });
+    expect(provider.getPointers()[1]).toMatchObject({ id: 'pen', source: 'mouse', fist: false, pressed: true });
     target.emit('pointerup', { pointerType: 'pen' });
     expect(provider.getPointers()[1].pressed).toBe(false);
     target.emit('pointerleave', { pointerType: 'pen' });
@@ -138,4 +138,18 @@ describe('PointerProvider', () => {
     expect(provider.getPointers()).toHaveLength(1);
     expect(target.style.cursor).toBe('crosshair');
   });
+});
+
+it('suppresses contextmenu only while started and applies right-button rules to pen',()=>{
+  const {target,provider}=setup(),preventDefault=vi.fn();
+  target.emit('contextmenu',{preventDefault});expect(preventDefault).toHaveBeenCalledOnce();
+  for(const pointerType of ['mouse','pen']) for(const buttons of [0,1,2,3]) {
+    target.emit('pointermove',{pointerType,buttons});
+    const pointer=provider.getPointers().find(p=>p.id===(pointerType==='pen'?'pen':'mouse'))!;
+    expect(pointer.fist).toBe((buttons&2)!==0);
+    expect(pointer.pressed).toBe(buttons===1);
+  }
+  target.emit('pointerdown',{pointerType:'touch',pointerId:5,buttons:3});
+  expect(provider.getPointers().find(p=>p.id==='touch-5')).toMatchObject({pressed:true,fist:false});
+  provider.stop();target.emit('contextmenu',{preventDefault});expect(preventDefault).toHaveBeenCalledOnce();
 });

@@ -141,7 +141,8 @@ export function drivePose(rig:NativeRig,input:readonly Vector3[],target:Vector3,
   const rotations=solveRotations(rig,drivePoints),worlds=boneWorldMatrices(rig.bones,rotations,rig.parentMatrix);
   const landmarks=actualLandmarks(rig,worlds);
   const targets=retargetLandmarks(rig,drivePoints);
-  const scale=points[0].distanceTo(points[9])/rig.landmarks[0].distanceTo(rig.landmarks[9]);
+  // modelScale 只縮小顯示大小；捏合點仍在縮放後對齊 target。
+  const scale=points[0].distanceTo(points[9])/rig.landmarks[0].distanceTo(rig.landmarks[9])*p.modelScale;
   const placement=new Matrix4().compose(new Vector3(),orientation,new Vector3(mirror?-scale:scale,scale,scale));
   const midpoint=landmarks[4].clone().add(landmarks[8]).multiplyScalar(.5).applyMatrix4(placement);
   placement.setPosition(target.clone().sub(midpoint));

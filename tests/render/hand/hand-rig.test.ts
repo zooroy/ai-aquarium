@@ -3,6 +3,7 @@ import { expect,it } from 'vitest';
 import { ROOT_BONE,FINGER_BONES,pinchAssistWeight,solveRotations,boneWorldMatrices,boneIndex,drivePose,actualLandmarks } from '../../../src/render/hand/hand-rig';
 import { createReplaySource,getReplayScript } from '../../../src/input/hand/replay-source';
 import { readNativeFixture } from './glb-fixture';
+import { HAND_RENDER_PARAMS } from '../../../src/config/params';
 const fixture=readNativeFixture(),rig=fixture.rig;
 it('matches every specified name and authored glove hierarchy',()=>{
   for(const name of [ROOT_BONE,...FINGER_BONES.flat()]) expect(fixture.json.nodes.some(n=>n.name===name)).toBe(true);
@@ -65,7 +66,8 @@ it.each([1000,5000])('aligns retargeted targets and bends first-person pinch tip
     expect(result.landmarks[4].clone().add(result.landmarks[8]).multiplyScalar(.5).distanceTo(target)).toBeLessThan(1e-10);
     // Check direction and length independently of the solved rotations and the debug points.
     const corrected=firstPersonLandmarks(points);
-    const scale=palmLength/rig.landmarks[0].distanceTo(rig.landmarks[9]);
+    const scale=palmLength/rig.landmarks[0].distanceTo(rig.landmarks[9])*HAND_RENDER_PARAMS.modelScale;
+    expect(result.landmarks[0].distanceTo(result.landmarks[9])).toBeCloseTo(palmLength*HAND_RENDER_PARAMS.modelScale,6);
     for(let f=0;f<5;f++) for(let k=0;k<3;k++) {
       const id=1+4*f+k,direction=result.targets[id+1].clone().sub(result.targets[id]);
       expect(direction.length()).toBeCloseTo(rig.landmarks[id+1].distanceTo(rig.landmarks[id])*scale,6);

@@ -30,6 +30,7 @@ export const CURSOR_PARAMS = {
   radius: 0.25,
   opacity: 0.55,
   pressedScale: 1.4,
+  fistScale: 0.7, // 握拳時縮小，和按下的放大區分。
   transitionDuration: 0.1, // 秒。
   idleEmissive: 0.08,
   pressedEmissive: 0.65,
@@ -126,6 +127,8 @@ export const HAND_TRACKER_PARAMS = {
 } as const;
 
 export const HAND_PARAMS = {
+  fistEnter: 1.25,
+  fistExit: 1.5,
   invertHandednessLabel: false, // MediaPipe Tasks 在未鏡像影像上的標籤即為使用者實際的手
   handednessMinScore: 0.7, handednessSwitchFrames: 3,
   pinchEnter: 0.25, pinchExit: 0.40,
@@ -144,6 +147,7 @@ export const GRAB_PARAMS = {
 } as const;
 
 export const HAND_RENDER_PARAMS = {
+  modelScale: 0.8, // 手套顯示大小相對於使用者手長的倍率。
   pinchAssistNear: 0.3,
   pinchAssistFar: 0.6,
   pinchAssistIterations: 8,
@@ -221,4 +225,9 @@ export const RELAY_PARAMS = {
 /** 觸控且螢幕短邊小於這個值（CSS px）的裝置視為手機，只顯示畫圖頁。 */
 export const DEVICE_PARAMS = {
   phoneMaxShortSide: 600,
+} as const;
+
+export const FIST_GATHER_PARAMS = {
+  centerZ: -1.5, radius: 3.5, band: 1.5, orbitSpeed: 1.4, depthSpread: 2.5,
+  radialGain: 2, tangentGain: 3, depthGain: 1, gatherWeight: 3, flockScale: 0.1,
 } as const;

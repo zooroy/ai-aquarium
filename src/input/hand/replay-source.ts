@@ -1,26 +1,16 @@
+import { blendPose } from './hand-poses';
 import { HAND_PARAMS as p } from '../../config/params';
 import { createRandom } from '../../core/random';
-import type { HandFrame, Landmark } from './types';
+import type { HandFrame } from './types';
 
-export interface ReplayKeyframe { timeMs: number; x: number; y: number; pinch: number; }
+export interface ReplayKeyframe { timeMs: number; x: number; y: number; pinch: number; fist?: number; }
 export interface ReplayScript {
   keyframes: readonly ReplayKeyframe[];
   dropouts?: readonly { startMs: number; endMs: number }[];
   jitter?: boolean;
 }
-// 掌根到中指根約8cm；表格於輸出時反轉 x 成未鏡像相機中的右手（拇指在右）。
-const OPEN: readonly (readonly number[])[] = [
-  [0, .08, 0], [-.035,.055,0],[-.06,.025,0],[-.08,0,0],[-.10,-.02,0],
-  [-.03,0,0],[-.035,-.035,0],[-.035,-.06,0],[-.035,-.08,0],
-  [0,0,0],[0,-.04,0],[0,-.07,0],[0,-.095,0],
-  [.025,.005,0],[.03,-.035,0],[.03,-.06,0],[.03,-.08,0],
-  [.045,.02,0],[.055,-.01,0],[.06,-.035,0],[.065,-.05,0],
-];
-const CLOSED = OPEN.map((point) => [...point]);
-CLOSED[2] = [-.05,.01,-.01]; CLOSED[3] = [-.035,-.02,-.02]; CLOSED[4] = [-.022,-.04,-.025];
-CLOSED[6] = [-.03,-.03,-.01]; CLOSED[7] = [-.025,-.045,-.02]; CLOSED[8] = [-.018,-.04,-.025];
-
 const scripts: Record<string, ReplayScript> = {
+  fist: { keyframes: [0,1000,6000,7000,10000].map(timeMs=>({timeMs,x:.5,y:.5,pinch:0,fist:timeMs>=1000&&timeMs<=6000?1:0})) },
   demo: { keyframes: [
     { timeMs: 0, x: .28, y: .5, pinch: 0 }, { timeMs: 2500, x: .5, y: .5, pinch: 0 },
     { timeMs: 3500, x: .5, y: .5, pinch: 1 }, { timeMs: 6500, x: .72, y: .5, pinch: 1 },
@@ -45,11 +35,7 @@ export function createReplaySource(script: ReplayScript): { frameAt(timeMs: numb
     const fraction = right.timeMs > left.timeMs ? Math.max(0, Math.min(1, (timeMs - left.timeMs) / (right.timeMs - left.timeMs))) : 0;
     const mix = (a: number, b: number) => a + (b - a) * fraction;
     const pinch = Math.max(0, Math.min(1, mix(left.pinch, right.pinch)));
-    const worldLandmarks: Landmark[] = OPEN.map((point, i) => ({
-      x: -(point[0] + (CLOSED[i][0] - point[0]) * pinch),
-      y: point[1] + (CLOSED[i][1] - point[1]) * pinch,
-      z: point[2] + (CLOSED[i][2] - point[2]) * pinch,
-    }));
+    const worldLandmarks = blendPose(pinch, mix(left.fist ?? 0, right.fist ?? 0));
     const center = { x: (worldLandmarks[4].x + worldLandmarks[8].x) / 2, y: (worldLandmarks[4].y + worldLandmarks[8].y) / 2 };
     // 依時間決定種子，重複或跳時呼叫仍得到相同影格。
     const random = createRandom(p.replaySeed + Math.floor(timeMs * p.replayHz / 1000));

@@ -8,7 +8,7 @@ import { FISH_PARAMS, GRAB_PARAMS } from '../../src/config/params';
 import type { Pointer } from '../../src/input/types';
 const bounds = { min: { x: -5, y: -4, z: -8 }, max: { x: 5, y: 4, z: 1.5 } };
 const ctx = { bounds, aspect: 1, projectToScreen: (p: Vector3) => ({ x: .5 + p.x / 10, y: .5 - p.y / 10 }), screenToWorld: (x: number, y: number, z: number) => new Vector3((x - .5) * 10, (.5 - y) * 10, z) };
-const pointer: Pointer = { id: 'mouse', x: .5, y: .5, pressed: true, source: 'mouse' };
+const pointer: Pointer = { id: 'mouse', x: .5, y: .5, fist: false, pressed: true, source: 'mouse' };
 function school(count = 2) { const fish = createSchool(count, bounds, createRandom(42)); fish.forEach((f, i) => { f.position.set(.3 + i * .3, 0, 0); f.scale = 1; }); return fish; }
 it('initializes normal fish and selects the closest candidate', () => {
   const fish = school(); expect(fish.every((f) => f.mode === 'swimming' && f.panic === 0 && f.fleeTime === 0)).toBe(true);
@@ -20,7 +20,7 @@ it('does not grab in empty space or by dragging an already pressed pointer', () 
   grab.update({ pointers: [{ ...pointer, x: 0 }] }, fish, 0, ctx);
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
   expect(fish.every((f) => f.mode === 'swimming')).toBe(true);
-  grab.update({ pointers: [{ ...pointer, pressed: false }] }, fish, 0, ctx);
+  grab.update({ pointers: [{ ...pointer, fist: false, pressed: false }] }, fish, 0, ctx);
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
   expect(fish[0].mode).toBe('grabbed');
 });
@@ -36,7 +36,7 @@ it.each(['mouse', 'touch', 'hand'] as const)('supports %s and only one grabbed f
   const fish = school(), grab = new GrabController();
   grab.update({ pointers: [{ ...pointer, source }, { ...pointer, id: 'second', x: .56 }] }, fish, 0, ctx);
   expect(fish.filter((f) => f.mode === 'grabbed')).toHaveLength(1);
-  grab.update({ pointers: [{ ...pointer, source, pressed: false }, { ...pointer, id: 'second', x: .56 }] }, fish, 0, ctx);
+  grab.update({ pointers: [{ ...pointer, source, fist: false, pressed: false }, { ...pointer, id: 'second', x: .56 }] }, fish, 0, ctx);
   expect(fish.filter((f) => f.mode === 'grabbed')).toHaveLength(0);
 });
 it('follows with separate xy/z time constants, raises panic and clamps bounds', () => {
@@ -52,7 +52,7 @@ it('follows with separate xy/z time constants, raises panic and clamps bounds', 
 it.each([false, true])('releases away from last/current pointer when missing=%s', (missing) => {
   const fish = school(1), grab = new GrabController();
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
-  grab.update({ pointers: missing ? [] : [{ ...pointer, pressed: false }] }, fish, 0, ctx);
+  grab.update({ pointers: missing ? [] : [{ ...pointer, fist: false, pressed: false }] }, fish, 0, ctx);
   expect(fish[0].mode).toBe('fleeing'); expect(fish[0].fleeTime).toBe(0);
   expect(fish[0].velocity.x).toBeGreaterThan(0); expect(fish[0].velocity.z).toBe(0);
   expect(fish[0].velocity.length()).toBeCloseTo(FISH_PARAMS.maxSpeed * GRAB_PARAMS.fleeSpeedMultiplier);
@@ -106,7 +106,7 @@ it.each([-1, 1])('caps upward escape pitch while preserving current horizontal h
   const fish = school(1), grab = new GrabController();
   fish[0].position.set(0, 0, GRAB_PARAMS.holdZ); fish[0].forward.set(heading, 0, 0);
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
-  grab.update({ pointers: [{ ...pointer, y: .6, pressed: false }] }, fish, 0, ctx);
+  grab.update({ pointers: [{ ...pointer, y: .6, fist: false, pressed: false }] }, fish, 0, ctx);
   const velocity = fish[0].velocity;
   expect(velocity.y).toBeGreaterThan(0);
   expect(Math.sign(velocity.x)).toBe(heading);
@@ -119,7 +119,7 @@ it.each([-1, 1])('preserves existing escape x sign %s when limiting pitch', (sig
   const fish = school(1), grab = new GrabController();
   fish[0].position.set(sign * .01, 0, GRAB_PARAMS.holdZ); fish[0].forward.set(-sign, 0, 0);
   grab.update({ pointers: [pointer] }, fish, 0, ctx);
-  grab.update({ pointers: [{ ...pointer, y: .6, pressed: false }] }, fish, 0, ctx);
+  grab.update({ pointers: [{ ...pointer, y: .6, fist: false, pressed: false }] }, fish, 0, ctx);
   expect(Math.sign(fish[0].velocity.x)).toBe(sign);
 });
 
@@ -155,7 +155,7 @@ it.each(['mouse','touch','hand'] as const)('disables grabbing immediately for %s
   grab.update({pointers:[pressed]},fish,0,ctx);
   grab.update({pointers:[pressed]},fish,0,ctx);
   expect(fish[0].mode).toBe('fleeing');
-  grab.update({pointers:[{...pressed,pressed:false}]},fish,0,ctx);
+  grab.update({pointers:[{...pressed,fist: false, pressed: false}]},fish,0,ctx);
   grab.update({pointers:[pressed]},fish,0,ctx);
   expect(fish[0].mode).toBe('grabbed');
 });
@@ -164,4 +164,11 @@ it('suppresses a new pointer held between enabling and the first update',()=>{
   grab.setEnabled(false);grab.setEnabled(true);
   grab.update({pointers:[pointer]},fish,0,ctx);
   expect(fish[0].mode).toBe('swimming');
+});
+
+it.each(['mouse','hand'] as const)('does not grab on %s fist and releases a held fish when forming a fist',source=>{
+ const fish=school(1),grab=new GrabController(),fist={...pointer,source,pressed:false,fist:true};
+ grab.update({pointers:[fist]},fish,0,ctx);expect(fish[0].mode).toBe('swimming');
+ grab.update({pointers:[{...fist,pressed:true,fist:false}]},fish,0,ctx);expect(fish[0].mode).toBe('grabbed');
+ grab.update({pointers:[fist]},fish,0,ctx);expect(fish[0].mode).toBe('fleeing');
 });

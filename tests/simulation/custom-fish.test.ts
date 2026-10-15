@@ -27,7 +27,7 @@ it('releases a deleted held fish on the next update and can grab again',()=>{
   const removed=fish[0],grab=new GrabController();
   const ctx={bounds,aspect:1,projectToScreen:(p:Vector3)=>({x:.5+p.x/10,y:.5-p.y/10}),
     screenToWorld:(x:number,y:number,z:number)=>new Vector3((x-.5)*10,(.5-y)*10,z)};
-  const pointer={id:'mouse',source:'mouse' as const,x:.5,y:.5,pressed:true};
+  const pointer={id:'mouse',source:'mouse' as const,x:.5,y:.5,fist: false, pressed: true};
   grab.update({pointers:[pointer]},fish,0,ctx);expect(removed.mode).toBe('grabbed');
   removeCustomFish(fish,'custom');grab.update({pointers:[pointer]},fish,0,ctx);
   expect(removed.mode).toBe('fleeing');expect(fish).toHaveLength(0);

@@ -11,7 +11,7 @@ import type { Pointer } from '../../src/input/types';
 const bounds = { min: { x: -5, y: -4, z: -8 }, max: { x: 5, y: 4, z: 1.5 } };
 const projectToScreen = (p: Vector3) => ({ x: 0.5 + p.x / 10, y: 0.5 - p.y / 10 });
 const grabCtx = { bounds, aspect: 1, projectToScreen, screenToWorld: (x: number, y: number, z: number) => new Vector3((x - 0.5) * 10, (0.5 - y) * 10, z) };
-const pointer: Pointer = { id: 'mouse', x: 0.5, y: 0.5, pressed: true, source: 'mouse' };
+const pointer: Pointer = { id: 'mouse', x: 0.5, y: 0.5, fist: false, pressed: true, source: 'mouse' };
 
 it.each(['dropping', 'leaving'] as const)('stepSchool leaves %s fish alone and ignores them as neighbours', (mode) => {
   const fish = createSchool(2, bounds, createRandom(1));
@@ -22,8 +22,8 @@ it.each(['dropping', 'leaving'] as const)('stepSchool leaves %s fish alone and i
   alone[0].position.copy(fish[0].position); alone[0].velocity.copy(fish[0].velocity); alone[0].forward.copy(fish[0].forward);
   const frozen = fish[1].position.clone();
   for (let i = 0; i < 10; i++) {
-    stepSchool(fish, 1 / 60, { bounds, time: i / 60, pointers: [], projectToScreen });
-    stepSchool(alone, 1 / 60, { bounds, time: i / 60, pointers: [], projectToScreen });
+    stepSchool(fish, 1 / 60, { screenToWorld: grabCtx.screenToWorld, bounds, time: i / 60, pointers: [], projectToScreen });
+    stepSchool(alone, 1 / 60, { screenToWorld: grabCtx.screenToWorld, bounds, time: i / 60, pointers: [], projectToScreen });
   }
   expect(fish[1].position).toEqual(frozen);
   expect(fish[0].position.distanceTo(alone[0].position)).toBeLessThan(1e-9);
@@ -45,7 +45,7 @@ it('lets go of a held fish once it starts leaving', () => {
   fish[0].mode = 'leaving';
   expect(() => grab.update({ pointers: [pointer] }, fish, 1 / 60, grabCtx)).not.toThrow();
   expect(fish[0].mode).toBe('leaving');
-  grab.update({ pointers: [{ ...pointer, pressed: false }] }, fish, 1 / 60, grabCtx);
+  grab.update({ pointers: [{ ...pointer, fist: false, pressed: false }] }, fish, 1 / 60, grabCtx);
   expect(fish[0].mode).toBe('leaving');
 });
 

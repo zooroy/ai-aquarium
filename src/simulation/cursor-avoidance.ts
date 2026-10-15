@@ -12,6 +12,7 @@ export function computeAvoidanceForce(
   if (pointers.length === 0) return force;
   const screen = projectToScreen(fish.position);
   for (const pointer of pointers) {
+    if (pointer.fist) continue;
     const dx = screen.x - pointer.x;
     const dy = pointer.y - screen.y; // 螢幕 y 向下，world y 向上。
     const distance = Math.hypot(dx, dy);

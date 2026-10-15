@@ -7,7 +7,7 @@ it('exposes one mirrored midpoint pointer, transformed joints and independent sn
   expect(provider.getPointers()).toEqual([]);
   const frame = source.frameAt(0)!; provider.ingest(frame, 0);
   const midpoint = { x: (frame.landmarks[4].x + frame.landmarks[8].x) / 2, y: (frame.landmarks[4].y + frame.landmarks[8].y) / 2 };
-  expect(provider.getPointers()).toEqual([{ id: 'hand-0', source: 'hand', ...mapToScreen(midpoint), pressed: false }]);
+  expect(provider.getPointers()).toEqual([{ id: 'hand-0', source: 'hand', ...mapToScreen(midpoint), fist: false, pressed: false }]);
   expect(provider.getHandPose().joints[0]).toEqual({ x: -frame.worldLandmarks[0].x, y: -frame.worldLandmarks[0].y, z: frame.worldLandmarks[0].z });
   const pose = provider.getHandPose(); pose.pointer.x = 99;
   expect(provider.getHandPose().pointer.x).not.toBe(99);

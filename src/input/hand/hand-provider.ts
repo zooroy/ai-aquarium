@@ -4,6 +4,7 @@ import type { HandFrame, HandPose } from './types';
 import { HandednessFilter } from './handedness';
 import { OneEuroFilter } from './one-euro';
 import { PinchDetector, pinchRatio } from './pinch';
+import { FistDetector, fistRatio } from './fist';
 import { mapToScreen } from './hand-mapping';
 
 export class HandProvider implements InputProvider {
@@ -13,18 +14,20 @@ export class HandProvider implements InputProvider {
   private readonly y = new OneEuroFilter();
   private readonly ratio = new OneEuroFilter();
   private readonly joints = Array.from({ length: 21 }, () => [new OneEuroFilter(), new OneEuroFilter(), new OneEuroFilter()]);
+  private readonly fistDetector = new FistDetector();
+  private readonly fistFilter = new OneEuroFilter();
   private readonly pinch = new PinchDetector();
   private lastSeen = -Infinity;
   private now: number | undefined;
-  private pose: HandPose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, handedness: null };
+  private pose: HandPose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, fist: false, fistRatio: Infinity, handedness: null };
   // 使用外部 ingest 注入，不在 provider 內持有 tracker、video 或時鐘。
   start(_target: Parameters<InputProvider['start']>[0]): void {}
   stop(): void {
     this.resetFilters(); this.lastSeen = -Infinity; this.now = undefined;
-    this.pose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, handedness: null };
+    this.pose = { visible: false, opacity: 0, joints: [], pointer: { x: 0.5, y: 0.5 }, pressed: false, fist: false, fistRatio: Infinity, handedness: null };
   }
   private resetFilters(): void {
-    this.handedness.reset();
+    this.handedness.reset(); this.fistDetector.reset(); this.fistFilter.reset();
     this.x.reset(); this.y.reset(); this.ratio.reset(); this.pinch.reset();
     for (const filters of this.joints) for (const filter of filters) filter.reset();
   }
@@ -42,7 +45,10 @@ export class HandProvider implements InputProvider {
     this.pose.joints = frame.worldLandmarks.map((joint, i) => ({
       x: this.joints[i][0].filter(-joint.x, time), y: this.joints[i][1].filter(-joint.y, time), z: this.joints[i][2].filter(joint.z, time),
     }));
-    this.pose.pressed = this.pinch.update(this.ratio.filter(ratio, time));
+    const rawFistRatio = fistRatio(frame.worldLandmarks);
+    this.pose.fistRatio = Number.isFinite(rawFistRatio) ? this.fistFilter.filter(rawFistRatio,time) : Infinity;
+    this.pose.fist = this.fistDetector.update(this.pose.fistRatio);
+    this.pose.pressed = this.pinch.update(this.ratio.filter(ratio, time)) && !this.pose.fist;
     this.lastSeen = nowMs; this.pose.visible = true;
   }
   /** 每個渲染幀先 update(nowMs)，再讀 pointers；無新偵測也會過期與淡出。 */
@@ -57,7 +63,7 @@ export class HandProvider implements InputProvider {
     this.now = nowMs;
   }
   getPointers(): Pointer[] {
-    return this.pose.visible ? [{ id: 'hand-0', source: 'hand', ...this.pose.pointer, pressed: this.pose.pressed }] : [];
+    return this.pose.visible ? [{ id: 'hand-0', source: 'hand', ...this.pose.pointer, pressed: this.pose.pressed, fist: this.pose.fist }] : [];
   }
   getHandPose(nowMs?: number): HandPose {
     if (nowMs !== undefined) this.update(nowMs);

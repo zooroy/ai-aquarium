@@ -15,11 +15,13 @@ export class PointerProvider implements InputProvider {
     this.previousStyle = { touchAction: target.style.touchAction, cursor: target.style.cursor };
     target.style.touchAction = 'none';
     target.style.cursor = 'none';
+    target.addEventListener('contextmenu', this.handleContextMenu);
     for (const type of EVENT_TYPES) target.addEventListener(type, this.handlePointer);
   }
 
   stop(): void {
     if (this.target) {
+      this.target.removeEventListener('contextmenu', this.handleContextMenu);
       for (const type of EVENT_TYPES) this.target.removeEventListener(type, this.handlePointer);
       if (this.previousStyle) {
         this.target.style.touchAction = this.previousStyle.touchAction;
@@ -34,6 +36,8 @@ export class PointerProvider implements InputProvider {
   getPointers(): Pointer[] {
     return Array.from(this.pointers.values(), (pointer) => ({ ...pointer }));
   }
+
+  private readonly handleContextMenu = (event: Event): void => { event.preventDefault(); };
 
   private readonly handlePointer = (event: PointerEvent): void => {
     if (!this.target) return;
@@ -54,7 +58,8 @@ export class PointerProvider implements InputProvider {
       id,
       x: clamp((event.clientX - rect.left) / rect.width),
       y: clamp((event.clientY - rect.top) / rect.height),
-      pressed: touch || (event.buttons & 1) !== 0,
+      pressed: touch || ((event.buttons & 1) !== 0 && (event.buttons & 2) === 0),
+      fist: !touch && (event.buttons & 2) !== 0,
       source: touch ? 'touch' : 'mouse',
     });
   };

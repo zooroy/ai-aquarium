@@ -4,6 +4,7 @@ export interface Pointer {
   id: string;          // e.g. 'mouse', 'touch-3', 'hand-0'
   x: number;           // 0..1, left -> right
   y: number;           // 0..1, top -> bottom
+  fist: boolean;
   pressed: boolean;    // mouse button down / touching / pinching
   source: InputSource;
 }

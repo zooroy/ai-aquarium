@@ -1,4 +1,5 @@
 import { HandAvatar } from './render/hand/hand-avatar';
+import { MouseHandPose } from './render/hand/mouse-hand';
 import { HandProvider } from './input/hand/hand-provider';
 import { createReplaySource, getReplayScript } from './input/hand/replay-source';
 import { shouldDetectFrame } from './input/hand/detection-timing';
@@ -41,6 +42,8 @@ export class App {
   private readonly handProvider = new HandProvider();
   private readonly grab = new GrabController();
   private handAvatar: HandAvatar | undefined;
+  private mouseAvatar: HandAvatar | undefined;
+  private readonly mouseHand = new MouseHandPose();
   private replay: ReturnType<typeof createReplaySource> | undefined;
   private replayStart: number | undefined;
   private lastReplay = -Infinity;
@@ -72,6 +75,7 @@ export class App {
       });
       this.cursorRenderer = new CursorRenderer(this.renderer.scene, this.renderer.camera);
       this.handAvatar = new HandAvatar(this.renderer.scene, this.renderer.camera, { debugRig: new URLSearchParams(location.search).has('debug') && new URLSearchParams(location.search).has('handRig') });
+      this.mouseAvatar = new HandAvatar(this.renderer.scene, this.renderer.camera);
       this.input.register(this.handProvider);
       const ctx = { getBounds: () => this.renderer.getBounds(), random };
       this.environment.push(createLighting(this.renderer.scene, ctx));
@@ -125,6 +129,7 @@ export class App {
       screenToWorld: this.renderer.screenToWorld, aspect: this.renderer.aspect,
     });
     stepSchool(this.fish, dt, {
+      screenToWorld: this.renderer.screenToWorld,
       bounds: this.renderer.getBounds(), time: this.time,
       pointers: state.pointers, projectToScreen: this.renderer.projectToScreen,
     });
@@ -132,11 +137,15 @@ export class App {
     this.customFishRenderer?.sync(this.fish, this.time);
     const handPose=this.handProvider.getHandPose();
     this.handAvatar?.sync(handPose, dt, this.renderer.screenToWorld);
+    // 同時只顯示一隻手套：鏡頭的手存在（含寬限時間）時，滑鼠改用多面體。
+    const cameraHand = handPose.visible;
+    const mousePointer = cameraHand ? undefined : state.pointers.find((pointer) => pointer.source === 'mouse');
+    this.mouseAvatar?.sync(this.mouseHand.update(mousePointer, dt), dt, this.renderer.screenToWorld);
     for (const module of this.environment) module.update(this.time);
     this.splash?.update(this.time);
-    this.cursorRenderer?.sync(state, dt);
+    this.cursorRenderer?.sync(state, dt, { mouseAsPolyhedron: cameraHand });
     this.renderer.render();
-    this.overlay?.setInteraction(this.fish, state, handPose.handedness);
+    this.overlay?.setInteraction(this.fish, state, handPose);
     this.overlay?.update(timestamp);
     this.frameId = requestAnimationFrame(this.frame);
   };
@@ -148,6 +157,7 @@ export class App {
     this.onboarding?.dispose();
     this.handProvider.stop();
     this.handAvatar?.dispose();
+    this.mouseAvatar?.dispose();
     this.overlay?.dispose();
     this.customFish?.dispose();
     this.fishRenderer?.dispose();

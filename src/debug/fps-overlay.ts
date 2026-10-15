@@ -1,4 +1,4 @@
-import type { HandSide } from '../input/hand/types';
+import type { HandPose } from '../input/hand/types';
 import type { Fish } from '../simulation/fish-state';
 import type { InputState } from '../input/types';
 import type { DetectionStats } from '../ui/camera-session';
@@ -21,7 +21,7 @@ export function createFpsCounter() {
 }
 
 export function createFpsOverlay(search: string, doc?: Document) {
-  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, setDetection(_stats: DetectionStats | undefined) {}, setInteraction(_fish: readonly Fish[], _state: InputState, _side?:HandSide|null) {}, dispose() {} };
+  if (!new URLSearchParams(search).has('debug')) return { update(_timestamp: number) {}, setDetection(_stats: DetectionStats | undefined) {}, setInteraction(_fish: readonly Fish[], _state: InputState, _pose?:HandPose) {}, dispose() {} };
   const target = doc ?? document;
   const element = target.createElement('div');
   element.textContent = 'FPS: —';
@@ -45,10 +45,12 @@ export function createFpsOverlay(search: string, doc?: Document) {
   return { update(timestamp: number) {
     const fps = sample(timestamp);
     if (fps !== undefined) { fpsText = `FPS: ${fps.toFixed(1)}`; refresh(); }
-  }, setDetection(stats: DetectionStats | undefined) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState, side?:HandSide|null) {
+  }, setDetection(stats: DetectionStats | undefined) { detection = stats; refresh(); }, setInteraction(fish: readonly Fish[], state: InputState, pose?:HandPose) {
     const hand = state.pointers.find((pointer) => pointer.source === 'hand');
+    const side=pose?.handedness;
+    const mouse=state.pointers.find(pointer=>pointer.source==='mouse');
     const custom = fish.filter((item) => item.customId !== undefined).length;
-    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}${custom > 0 ? `｜自訂魚：${custom}` : ''}｜手:${hand ? (hand.pressed ? '捏住' : '張開') + (side ? `(${side==='right'?'右':'左'})` : '(未定)') : '無'}`;
+    const next = `｜抓住：${fish.filter((item) => item.mode === 'grabbed').length}｜逃走：${fish.filter((item) => item.mode === 'fleeing').length}${custom > 0 ? `｜自訂魚：${custom}` : ''}｜手:${hand ? (hand.fist ? '握拳' : hand.pressed ? '捏住' : '張開') + (side ? `(${side==='right'?'右':'左'})` : '(未定)') : '無'}${hand ? `｜握拳比例:${(pose?.fistRatio ?? Infinity).toFixed(2)}` : ''}${mouse ? `｜滑鼠:${mouse.fist?'握拳':mouse.pressed?'按下':'未按'}` : ''}`;
     if (next !== interaction) { interaction = next; refresh(); }
   }, dispose() { element.remove(); } };
 }

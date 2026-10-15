@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { InputManager } from '../../src/input/input-manager';
 import type { InputProvider, Pointer } from '../../src/input/types';
 
-const pointer: Pointer = { id: 'hand-0', x: 0.5, y: 0.5, pressed: false, source: 'hand' };
+const pointer: Pointer = { id: 'hand-0', x: 0.5, y: 0.5, fist: false, pressed: false, source: 'hand' };
 const provider = (pointers: Pointer[]): InputProvider => ({
   name: 'fake', start() {}, stop() {}, getPointers: () => pointers,
 });

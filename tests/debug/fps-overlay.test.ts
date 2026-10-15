@@ -1,3 +1,4 @@
+import { HandProvider } from '../../src/input/hand/hand-provider';
 import { expect, it, vi } from 'vitest';
 import { createFpsCounter, createFpsOverlay } from '../../src/debug/fps-overlay';
 it('averages actual frame intervals every half second', () => {
@@ -46,9 +47,25 @@ it('shows grabbed/fleeing counts and hand press states in debug mode', async () 
   const element={textContent:'',style:{},remove:vi.fn()};
   const overlay=createFpsOverlay('?debug',{createElement:()=>element,body:{append(){}}} as unknown as Document);
   for (const pressed of [false,true]) for(const side of ['left','right'] as const) {
-    overlay.setInteraction(fish,{pointers:[{id:'hand-0',source:'hand',x:.5,y:.5,pressed}]},side);
+    overlay.setInteraction(fish,{pointers:[{id:'hand-0',source:'hand',x:.5,y:.5,fist:false,pressed}]},{...new HandProvider().getHandPose(),handedness:side});
     expect(element.textContent).toContain('抓住：1｜逃走：1');
     expect(element.textContent).toContain((pressed?'手:捏住':'手:張開')+(side==='right'?'(右)':'(左)'));
   }
   overlay.setInteraction(fish,{pointers:[]}); expect(element.textContent).toContain('手:無'); overlay.dispose();
+});
+
+it('shows hand fist ratio and all mouse button states only while their pointers exist',()=>{
+  const element={textContent:'',style:{},remove:vi.fn()};
+  const overlay=createFpsOverlay('?debug',{createElement:()=>element,body:{append(){}}} as unknown as Document);
+  const pose={...new HandProvider().getHandPose(),visible:true,handedness:'right' as const,fist:true,fistRatio:1.123};
+  const hand={id:'hand-0',source:'hand' as const,x:.5,y:.5,pressed:false,fist:true};
+  for(const [pressed,fist,label] of [[false,true,'握拳'],[true,false,'按下'],[false,false,'未按']] as const) {
+    overlay.setInteraction([],{pointers:[hand,{id:'mouse',source:'mouse',x:.5,y:.5,pressed,fist}]},pose);
+    expect(element.textContent).toContain('手:握拳(右)｜握拳比例:1.12');
+    expect(element.textContent).toContain('滑鼠:'+label);
+  }
+  overlay.setInteraction([],{pointers:[]},pose);
+  expect(element.textContent).toContain('手:無');
+  expect(element.textContent).not.toContain('握拳比例');expect(element.textContent).not.toContain('滑鼠:');
+  overlay.dispose();
 });
