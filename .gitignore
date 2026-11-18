@@ -3,3 +3,7 @@ dist/
 .DS_Store
 public/mediapipe/wasm/
 .env.local
+dist-e2e/
+playwright-report/
+test-results/
+acceptance/

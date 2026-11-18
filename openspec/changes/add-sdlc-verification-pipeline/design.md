@@ -93,7 +93,7 @@
 
 | 測試標題 | 步驟與斷言 |
 |---|---|
-| `畫圖頁在沒有轉交設定時載入` | 沒有 `#aquarium`；「畫一隻魚」標題可見；`PHONE_MESSAGES.unavailable` 的文字可見。文字從 `src/config` import，不要寫死。 |
+| `畫圖頁在沒有轉交設定時載入` | 沒有 `#aquarium`；「畫一隻魚」標題可見；`PHONE_MESSAGES.unavailable` 的文字可見。文字從 `src/phone/phone-page.ts` 匯出的 `PHONE_MESSAGES` import，不要寫死。若在 Playwright 的 Node 環境 import 該模組會出錯，才改成寫死字串，並加註解指出來源。 |
 
 - **選取元素**：用 `getByRole` 或 `getByText`。不為了測試在產品程式碼加 `data-testid`。
 - **畫布截圖**：只比對 buffer 是否不同，不做像素比對，所以不需要額外的 PNG 解碼套件。

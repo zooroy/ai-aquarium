@@ -20,15 +20,15 @@
 
 ## 2. Playwright smoke 測試
 
-- [ ] 2.1 依 design 決定 2，新增 `playwright.config.ts`、npm scripts（`test:e2e`、`test:e2e:install`），安裝 `@playwright/test`。`.gitignore` 加上 `dist-e2e/`、`playwright-report/`、`test-results/`、`acceptance/`。`tsconfig.json` 的 `include` 加上 `playwright.config.ts`。驗證方式：
+- [x] 2.1 依 design 決定 2，新增 `playwright.config.ts`、npm scripts（`test:e2e`、`test:e2e:install`），安裝 `@playwright/test`。`.gitignore` 加上 `dist-e2e/`、`playwright-report/`、`test-results/`、`acceptance/`。`tsconfig.json` 的 `include` 加上 `playwright.config.ts`。驗證方式：
   - `npm run test:e2e:install` 成功。
   - 在沒有任何 e2e 測試時，`npx playwright test --list` 可以執行，不會出錯。
   - `npm run typecheck` 和 `npm run lint` 通過。
   - `npm test` 沒有收到 `tests/e2e/` 底下的檔案。
-- [ ] 2.2 依 design 決定 3，新增 `tests/e2e/fixtures.ts`、`aquarium.e2e.ts`、`phone.e2e.ts`。測試標題要和 design 的表格完全相同。驗證方式：
+- [x] 2.2 依 design 決定 3，新增 `tests/e2e/fixtures.ts`、`aquarium.e2e.ts`、`phone.e2e.ts`。測試標題要和 design 的表格完全相同。驗證方式：
   - 本機 `npm run test:e2e` 的 4 個測試全部通過，連續執行 3 次都通過。
   - **負向驗證**：暫時在 `src/main.ts` 開頭加 `console.error('x')`，確認至少一個測試失敗、失敗訊息裡有 `x`。驗證完要還原，並在回報裡說明。
-  - `phone.e2e.ts` 的提示文字從 `src/config` import，不寫死。
+  - `phone.e2e.ts` 的提示文字從 `src/phone/phone-page.ts` 的 `PHONE_MESSAGES` import（design 決定 3）。
   - 沒有修改 `src/` 底下的檔案（第 1 組的機械式修正除外）。
   - 若 headless 沒有 WebGL 導致失敗：停下來回報，不要跳過測試。
 
