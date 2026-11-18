@@ -12,7 +12,8 @@
     "prebuild": "node scripts/copy-mediapipe-wasm.mjs",
     "lint": "eslint .",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "report": "node scripts/acceptance-report.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.0.1",

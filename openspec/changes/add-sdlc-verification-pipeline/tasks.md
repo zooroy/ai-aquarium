@@ -34,10 +34,10 @@
 
 ## 3. 情境對照與驗收報告
 
-- [ ] 3.1 依 design 決定 4，新增 `tests/e2e/scenario-map.json`，內容是 design 表格裡的 12 筆。驗證方式：
+- [x] 3.1 依 design 決定 4，新增 `tests/e2e/scenario-map.json`，內容是 design 表格裡的 12 筆。驗證方式：
   - 每一筆的 capability 目錄存在，情境名稱可以在該 spec 裡找到。這一點由 3.2 的腳本檢查。
   - 回報列出哪些 e2e 對照，是讀過 THEN 之後判斷「只驗證了一部分」而改成 manual 的。
-- [ ] 3.2 依 design 決定 5，新增 `scripts/acceptance-report-lib.mjs`、`acceptance-report-lib.d.mts`、`acceptance-report.mjs` 和 `npm run report`。新增 `tests/scripts/acceptance-report.test.ts`，用假資料驗證：
+- [x] 3.2 依 design 決定 5，新增 `scripts/acceptance-report-lib.mjs`、`acceptance-report-lib.d.mts`、`acceptance-report.mjs` 和 `npm run report`。新增 `tests/scripts/acceptance-report.test.ts`，用假資料驗證：
   - `parseScenarios`：抓出 `#### Scenario: ` 開頭的行，capability 取自目錄名稱，忽略 `archive/`。
   - `validateMap`：找不到的 capability、找不到的情境、`e2e` 和 `manual` 兩者都有或都沒有，都會回報。
   - 情境結果：

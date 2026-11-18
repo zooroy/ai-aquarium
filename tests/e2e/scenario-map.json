@@ -1,0 +1,14 @@
+[
+  { "capability": "aquarium-scene", "scenario": "開啟頁面", "manual": "確認魚缸填滿視窗且沒有水平或垂直捲軸", "note": "魚缸載入並持續繪製已自動驗證畫布持續更新；未驗證滿版與捲軸。" },
+  { "capability": "camera-onboarding", "scenario": "首次載入", "manual": "確認開場說明、隱私說明與兩個按鈕完整顯示", "note": "魚缸載入並持續繪製已驗證用滑鼠玩按鈕與背景動畫；未驗證其餘開場內容。" },
+  { "capability": "camera-onboarding", "scenario": "用滑鼠玩", "manual": "確認不請求鏡頭權限且滑鼠能操作魚缸", "note": "用滑鼠玩並關閉說明卡已驗證開場關閉；滑鼠操作不出錯只驗證無錯誤，未驗證互動效果與權限請求。" },
+  { "capability": "interaction-guide", "scenario": "用滑鼠玩之後", "manual": "確認出現的是滑鼠模式說明卡，且此時開場已消失", "note": "用滑鼠玩並關閉說明卡已點擊開始玩並驗證兩張卡關閉；未斷言關閉前的說明卡模式與開場狀態。" },
+  { "capability": "interaction-guide", "scenario": "關閉說明卡", "manual": "確認 Esc 關閉及關閉後可操作魚缸", "note": "用滑鼠玩並關閉說明卡已驗證開始玩按鈕關閉；未驗證 Esc 與互動效果。" },
+  { "capability": "phone-drawing", "scenario": "強制畫圖模式", "e2e": "畫圖頁在沒有轉交設定時載入" },
+  { "capability": "verification-pipeline", "scenario": "魚缸載入", "e2e": "魚缸載入並持續繪製" },
+  { "capability": "verification-pipeline", "scenario": "用滑鼠開始玩", "e2e": "用滑鼠玩並關閉說明卡" },
+  { "capability": "verification-pipeline", "scenario": "滑鼠操作", "e2e": "滑鼠操作不出錯" },
+  { "capability": "verification-pipeline", "scenario": "開啟畫圖頁", "e2e": "畫圖頁在沒有轉交設定時載入" },
+  { "capability": "camera-onboarding", "scenario": "成功開啟鏡頭", "manual": "CI 沒有鏡頭，由 Claude 在本機瀏覽器驗收" },
+  { "capability": "camera-onboarding", "scenario": "拒絕鏡頭權限", "manual": "CI 沒有鏡頭，由 Claude 在本機瀏覽器驗收" }
+]
