@@ -68,7 +68,7 @@
   - PR 上的 `verify` 檢查通過。
   - 從 artifact 下載 `acceptance/report.md`：所有 e2e 情境都通過，audit 摘要列出 dev 相依的 picomatch high。
   - 截圖或貼出 PR 的檢查狀態給使用者。
-- [ ] 5.3 **[Claude]** 在 PR 上做一次負向驗證：推一個故意違反 lint 的 commit（例如在 `src/simulation/` 用 `Math.random()`）。驗證方式：
+- [x] 5.3 **[Claude]** 在 PR 上做一次負向驗證：推一個故意違反 lint 的 commit（例如在 `src/simulation/` 用 `Math.random()`）。驗證方式：
   - `verify` 失敗在 `lint` 步驟。
   - 報告裡 `lint` 為 failure，後續步驟為 skipped。
   - 驗證後 revert 這個 commit，檢查恢復通過。
