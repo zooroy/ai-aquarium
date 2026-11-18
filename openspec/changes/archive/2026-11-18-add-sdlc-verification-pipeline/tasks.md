@@ -72,7 +72,7 @@
   - `verify` 失敗在 `lint` 步驟。
   - 報告裡 `lint` 為 failure，後續步驟為 skipped。
   - 驗證後 revert 這個 commit，檢查恢復通過。
-- [ ] 5.4 **[User]** PR 合併到 `main` 之後，在 GitHub 為 `main` 開啟 branch protection（design 決定 7）。Claude 會提供 `gh api` 指令，由使用者執行。驗證方式：
+- [x] 5.4 **[User]** PR 合併到 `main` 之後，在 GitHub 為 `main` 開啟 branch protection（design 決定 7）。Claude 會提供 `gh api` 指令，由使用者執行。驗證方式：
   - 在新分支開一個 CI 失敗的 PR，GitHub 不允許合併。驗證完關閉這個 PR。
 
 ## Workflow follow-up
