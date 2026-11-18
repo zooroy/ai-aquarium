@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, Vector3, Mesh, MeshStandardMaterial, Texture, FrontSide, Group, BufferGeometry, Float32BufferAttribute, SkinnedMesh } from 'three';
+import { PerspectiveCamera, Scene, Vector3, MeshStandardMaterial, Texture, FrontSide, Group, SkinnedMesh } from 'three';
 import { expect, it, vi } from 'vitest';
 import { HandAvatar } from '../../../src/render/hand/hand-avatar';
 import { advanceHandBubbles, bubbleOpacity, transformHandJoints } from '../../../src/render/hand/hand-transforms';
@@ -87,7 +87,8 @@ it('retains native weights/bind matrices and bone offsets while mirroring the ou
 });
 it('places orange retarget markers over actual driven joints after pinch alignment for either hand',async()=>{
   const {ROOT_BONE,FINGER_BONES,loadedBoneName,pinchAssistWeight}=await import('../../../src/render/hand/hand-rig');
-  const fixture=readNativeFixture(),scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load,debugRig:true});await avatar.ready;
+  readNativeFixture();
+  const scene=new Scene(),avatar=new HandAvatar(scene,new PerspectiveCamera(),{load,debugRig:true});await avatar.ready;
   for(const time of [1000,5000]) for(const mirror of [false,true]) {
     const provider=new HandProvider();provider.ingest(createReplaySource(getReplayScript('demo')).frameAt(time),time);
     const state=provider.getHandPose(time+100);

@@ -7,11 +7,11 @@
 
 ## 1. ESLint
 
-- [ ] 1.1 依 design 決定 1，新增 `eslint.config.js` 和 `npm run lint`，安裝 `eslint`、`@eslint/js`、`typescript-eslint`。驗證方式：
+- [x] 1.1 依 design 決定 1，新增 `eslint.config.js` 和 `npm run lint`，安裝 `eslint`、`@eslint/js`、`typescript-eslint`。驗證方式：
   - 在目前的程式碼上執行 `npm run lint`，exit code 為 0。
   - 回報列出所有因為既有程式碼違規而降為 `warn` 的推薦規則，以及做過的機械式修正（檔案和原因）。
   - 專案規則（`no-explicit-any`、`Math.random`、純邏輯目錄的 Three.js 渲染類別）沒有被降級。
-- [ ] 1.2 為三條專案規則新增 `tests/lint/project-rules.test.ts`。用 ESLint 的 Node API（`new ESLint({ overrideConfigFile: 'eslint.config.js' })` 加上 `lintText` 並指定 `filePath`）驗證：
+- [x] 1.2 為三條專案規則新增 `tests/lint/project-rules.test.ts`。用 ESLint 的 Node API（`new ESLint({ overrideConfigFile: 'eslint.config.js' })` 加上 `lintText` 並指定 `filePath`）驗證：
   - `src/simulation/x.ts` 裡的 `Math.random()` 報錯；`src/core/random.ts` 裡的不報錯。
   - `src/simulation/x.ts` 從 `three` import `Mesh`、`MeshBasicMaterial`、`WebGLRenderer` 都報錯；import `Vector3`、`Quaternion` 不報錯。
   - `src/render/x.ts` 從 `three` import `Mesh` 不報錯。
