@@ -53,7 +53,7 @@
 
 ## 4. CI
 
-- [ ] 4.1 依 design 決定 6，新增 `.github/workflows/ci.yml`，`pages.yml` 不修改。驗證方式：
+- [x] 4.1 依 design 決定 6，新增 `.github/workflows/ci.yml`，`pages.yml` 不修改。驗證方式：
   - 用 `npx --yes @action-validator/cli@0.6.0 .github/workflows/ci.yml` 或同等工具確認語法正確。無法執行時在回報裡說明，由 Claude 在 PR 上驗證。
   - 每個步驟的 `id` 和 design 相同。
   - 第 9～11 步有 `if: always()`。
