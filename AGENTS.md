@@ -28,6 +28,16 @@
 | `npm run build` | 正式建置 |
 | `npm test` | 執行 Vitest 單元測試（node 環境） |
 | `npm run typecheck` | `tsc --noEmit` 型別檢查 |
+| `npm run lint` | ESLint，含專案規則（不用 `any`、不直接用 `Math.random()`、純邏輯目錄不 import Three.js 渲染類別） |
+| `npm run test:e2e:install` | 安裝 Playwright 用的 Chromium（第一次執行 e2e 前） |
+| `npm run test:e2e` | Playwright smoke 測試（`tests/e2e/*.e2e.ts`，自動建置到 `dist-e2e/` 並啟動 preview） |
+| `npm run report` | 依 e2e 結果和 `tests/e2e/scenario-map.json` 產生 `acceptance/report.md` |
+
+## 分支與 PR
+
+- 不直接 commit 到 `main`。每個 OpenSpec change 在分支 `change/<change-name>` 上進行，經 PR 合併。
+- PR 的 CI（`.github/workflows/ci.yml` 的 `verify`）通過才能合併。
+- 新增或改名 e2e 測試時，要同步更新 `tests/e2e/scenario-map.json`。
 
 網址參數：`?seed=<number>` 固定亂數種子；`?debug` 顯示 fps。
 
@@ -55,8 +65,12 @@ npm test：
 <完整輸出的最後摘要，含通過與失敗數>
 npm run typecheck：
 <輸出，或「無錯誤」>
+npm run lint：
+<errors／warnings 數>
 npm run build（如果任務要求）：
 <輸出摘要>
+npm run test:e2e（如果任務要求）：
+<通過與失敗數>
 備註：
 <偏離規格的地方、不確定的地方、建議 Claude 驗收時注意的事>
 ```

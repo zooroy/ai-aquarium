@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+        continue-on-error: false
+      - id: setup_node
+        uses: actions/setup-node@v4
+        continue-on-error: false
+        with:
+          node-version: 22
+          cache: npm
+      - id: install
+        run: npm ci
+        continue-on-error: false
+      - id: typecheck
+        run: npm run typecheck
+        continue-on-error: false
+      - id: lint
+        run: npm run lint
+        continue-on-error: false
+      - id: test
+        run: npm test
+        continue-on-error: false
+      - id: build
+        run: npm run build
+        continue-on-error: false
+      - id: audit
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: false
+      - id: playwright_version
+        run: node -e 'console.log("version=" + require("@playwright/test/package.json").version)' >> "$GITHUB_OUTPUT"
+        continue-on-error: false
+      - id: playwright_cache
+        uses: actions/cache@v4
+        continue-on-error: false
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright_version.outputs.version }}
+      - id: playwright_install
+        run: npx playwright install --with-deps chromium
+        continue-on-error: false
+      - id: e2e
+        run: npm run test:e2e
+        continue-on-error: false
+      - id: audit_reports
+        if: always()
+        continue-on-error: false
+        run: |
+          mkdir -p acceptance
+          npm audit --json > acceptance/audit-all.json || true
+          npm audit --omit=dev --json > acceptance/audit-prod.json || true
+      - id: report
+        if: always()
+        continue-on-error: false
+        run: node scripts/acceptance-report.mjs
+        env:
+          CHECK_CHECKOUT: ${{ steps.checkout.outcome }}
+          CHECK_SETUP_NODE: ${{ steps.setup_node.outcome }}
+          CHECK_INSTALL: ${{ steps.install.outcome }}
+          CHECK_TYPECHECK: ${{ steps.typecheck.outcome }}
+          CHECK_LINT: ${{ steps.lint.outcome }}
+          CHECK_TEST: ${{ steps.test.outcome }}
+          CHECK_BUILD: ${{ steps.build.outcome }}
+          CHECK_AUDIT: ${{ steps.audit.outcome }}
+          CHECK_PLAYWRIGHT_VERSION: ${{ steps.playwright_version.outcome }}
+          CHECK_PLAYWRIGHT_CACHE: ${{ steps.playwright_cache.outcome }}
+          CHECK_PLAYWRIGHT_INSTALL: ${{ steps.playwright_install.outcome }}
+          CHECK_E2E: ${{ steps.e2e.outcome }}
+          CHECK_AUDIT_REPORTS: ${{ steps.audit_reports.outcome }}
+      - id: artifacts
+        if: always()
+        continue-on-error: false
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-${{ github.sha }}
+          path: |
+            acceptance/
+            playwright-report/
+            test-results/
+          retention-days: 14
