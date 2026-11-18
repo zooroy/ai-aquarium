@@ -62,7 +62,7 @@
 
 ## 5. 文件與交付 [Claude]
 
-- [ ] 5.1 **[Claude]** 依 design 決定 7 修改 `AGENTS.md`：指令表、回報格式、「不直接 commit 到 `main`、分支命名 `change/<name>`」。驗證方式：
+- [x] 5.1 **[Claude]** 依 design 決定 7 修改 `AGENTS.md`：指令表、回報格式、「不直接 commit 到 `main`、分支命名 `change/<name>`」。驗證方式：
   - 指令表列出的每個指令在 `package.json` 裡都存在。
 - [ ] 5.2 **[Claude]** 推送分支並開 PR。驗證方式：
   - PR 上的 `verify` 檢查通過。
